@@ -12,7 +12,7 @@ members = [
   "core/tauri-config-schema",
 
   # integration tests
-  "core/tests/restart",
+  "core/tests/restart", "multiwebview",
 ]
 
 exclude = [

@@ -1,0 +1,38 @@
+{
+    "build": {
+      "beforeBuildCommand": "",
+      "beforeDevCommand": "",
+      "devPath": "src",
+      "distDir": "src",
+      "withGlobalTauri": true
+    },
+    "package": {
+      "productName": "TapX",
+      "version": "0.2.8"
+    },
+    "plugins": {
+      "shell": {
+        "open": true
+      }
+    },
+    "tauri": {
+      "bundle": {
+        "active": true,
+        "icon": [
+          "icons/icon.png",
+          "icons/icon.icns",
+          "icons/icon.ico"
+        ],
+        "identifier": "Multiwebview",
+        "targets": [
+          "nsis",
+          "deb",
+          "dmg"
+        ]
+      },
+      "security": {
+        "csp": null
+      },
+      "windows": []
+    }
+  }
