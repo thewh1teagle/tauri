@@ -1,5 +1,33 @@
 # Changelog
 
+## \[2.0.0-beta.3]
+
+### New Features
+
+- [`fdcaf935`](https://www.github.com/tauri-apps/tauri/commit/fdcaf935fa75ecfa2806939c4faad4fe9e880386)([#8939](https://www.github.com/tauri-apps/tauri/pull/8939)) Added the `reparent` function to the webview API.
+
+## \[2.0.0-beta.2]
+
+### Breaking Changes
+
+- [`361ec37f`](https://www.github.com/tauri-apps/tauri/commit/361ec37fd4a5caa5b6630b9563ef079f53c6c336)([#8932](https://www.github.com/tauri-apps/tauri/pull/8932)) Removed the `unityUri` option from the progress bar state, no longer required.
+
+## \[2.0.0-beta.1]
+
+### New Features
+
+- [`16e550ec`](https://www.github.com/tauri-apps/tauri/commit/16e550ec1503765158cdc3bb2a20e70ec710e981)([#8844](https://www.github.com/tauri-apps/tauri/pull/8844)) Add a new `webviewWindow` module that exports `WebviewWindow` class and related methods such as `getCurrent` and `getAll`.
+- [`16e550ec`](https://www.github.com/tauri-apps/tauri/commit/16e550ec1503765158cdc3bb2a20e70ec710e981)([#8844](https://www.github.com/tauri-apps/tauri/pull/8844)) Add `Window.onFileDropEvent` method.
+
+### Breaking Changes
+
+- [`16e550ec`](https://www.github.com/tauri-apps/tauri/commit/16e550ec1503765158cdc3bb2a20e70ec710e981)([#8844](https://www.github.com/tauri-apps/tauri/pull/8844)) Renamed the following enum variants of `TauriEvent` enum:
+
+  - `TauriEvent.WEBVIEW_FILE_DROP` -> `TauriEvent.FILE_DROP`
+  - `TauriEvent.WEBVIEW_FILE_DROP_HOVER` -> `TauriEvent.FILE_DROP_HOVER`
+  - `TauriEvent.WEBVIEW_FILE_DROP_CANCELLED` -> `TauriEvent.FILE_DROP_CANCELLED`
+- [`16e550ec`](https://www.github.com/tauri-apps/tauri/commit/16e550ec1503765158cdc3bb2a20e70ec710e981)([#8844](https://www.github.com/tauri-apps/tauri/pull/8844)) Move `WebviewWindow` class from `webview` module to a new `webviewWindow` module.
+
 ## \[2.0.0-beta.0]
 
 ### New Features
@@ -23,9 +51,6 @@
 
 ## \[2.0.0-alpha.14]
 
-### Bug Fixes
-
-- [`1c582a94`](https://www.github.com/tauri-apps/tauri/commit/1c582a942e345a066b65620e4db9f688ec142bb9)([#8392](https://www.github.com/tauri-apps/tauri/pull/8392)) Fix a regression where typescript could not find types when using `"moduleResolution": "node"`
 - [`97e33412`](https://www.github.com/tauri-apps/tauri/commit/97e334129956159bbd60e1c531b6acd3bc6139a6)([#8534](https://www.github.com/tauri-apps/tauri/pull/8534)) `mockIPC` and `mockWindows` no longer crash if `window.__TAURI_INTERNALS__` is undefined.
 
 ## \[2.0.0-alpha.13]
@@ -155,6 +180,12 @@
 
 - First mobile alpha release!
   - [fa3a1098](https://www.github.com/tauri-apps/tauri/commit/fa3a10988a03aed1b66fb17d893b1a9adb90f7cd) feat(ci): prepare 2.0.0-alpha.0 ([#5786](https://www.github.com/tauri-apps/tauri/pull/5786)) on 2022-12-08
+
+## \[1.5.3]
+
+### Bug Fixes
+
+- [`1c582a94`](https://www.github.com/tauri-apps/tauri/commit/1c582a942e345a066b65620e4db9f688ec142bb9)([#8392](https://www.github.com/tauri-apps/tauri/pull/8392)) Fix a regression where typescript could not find types when using `"moduleResolution": "node"`
 
 ## \[1.5.2]
 

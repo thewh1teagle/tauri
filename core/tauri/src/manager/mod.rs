@@ -175,7 +175,7 @@ pub struct Asset {
 
 #[default_runtime(crate::Wry, wry)]
 pub struct AppManager<R: Runtime> {
-  pub runtime_authority: RuntimeAuthority,
+  pub runtime_authority: Mutex<RuntimeAuthority>,
   pub window: window::WindowManager<R>,
   pub webview: webview::WebviewManager<R>,
   #[cfg(all(desktop, feature = "tray-icon"))]
@@ -245,7 +245,7 @@ impl<R: Runtime> AppManager<R> {
     }
 
     Self {
-      runtime_authority: RuntimeAuthority::new(context.resolved_acl),
+      runtime_authority: Mutex::new(context.runtime_authority),
       window: window::WindowManager {
         windows: Mutex::default(),
         default_icon: context.default_window_icon,
@@ -469,7 +469,7 @@ impl<R: Runtime> AppManager<R> {
     event: String,
     target: EventTarget,
     handler: F,
-  ) {
+  ) -> EventId {
     assert_event_name_is_valid(&event);
     self.listeners().once(event, target, handler)
   }
@@ -528,7 +528,8 @@ impl<R: Runtime> AppManager<R> {
   }
 
   pub(crate) fn on_window_close(&self, label: &str) {
-    if let Some(window) = self.window.windows_lock().remove(label) {
+    let window = self.window.windows_lock().remove(label);
+    if let Some(window) = window {
       for webview in window.webviews() {
         self.webview.webviews_lock().remove(webview.label());
       }

@@ -1,5 +1,35 @@
 # Changelog
 
+## \[2.0.0-beta.4]
+
+### New Features
+
+- [`fdcaf935`](https://www.github.com/tauri-apps/tauri/commit/fdcaf935fa75ecfa2806939c4faad4fe9e880386)([#8939](https://www.github.com/tauri-apps/tauri/pull/8939)) Added the `reparent` function to the webview API.
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.4`
+
+## \[2.0.0-beta.3]
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.3`
+
+## \[2.0.0-beta.2]
+
+### What's Changed
+
+- [`16e550ec`](https://www.github.com/tauri-apps/tauri/commit/16e550ec1503765158cdc3bb2a20e70ec710e981)([#8844](https://www.github.com/tauri-apps/tauri/pull/8844)) Add `WebviewEvent`, `RunEvent::WebviewEvent` and `WebviewDispatch::on_webview_event`.
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.2`
+
+### Breaking Changes
+
+- [`2f55bfec`](https://www.github.com/tauri-apps/tauri/commit/2f55bfecbf0244f3b5aa1ad7622182fca3fcdcbb)([#8795](https://www.github.com/tauri-apps/tauri/pull/8795)) Update raw-window-handle to 0.6.
+
 ## \[2.0.0-beta.1]
 
 ### Dependencies
@@ -185,6 +215,12 @@
 - First mobile alpha release!
   - Bumped due to a bump in tauri-utils.
   - [fa3a1098](https://www.github.com/tauri-apps/tauri/commit/fa3a10988a03aed1b66fb17d893b1a9adb90f7cd) feat(ci): prepare 2.0.0-alpha.0 ([#5786](https://www.github.com/tauri-apps/tauri/pull/5786)) on 2022-12-08
+
+## \[0.14.2]
+
+### Dependencies
+
+- Upgraded to `tauri-utils@1.5.2`
 
 ## \[0.14.1]
 

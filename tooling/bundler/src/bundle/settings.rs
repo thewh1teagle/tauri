@@ -180,6 +180,14 @@ pub struct DebianSettings {
   #[doc = include_str!("./linux/templates/main.desktop")]
   /// ```
   pub desktop_template: Option<PathBuf>,
+  /// Define the section in Debian Control file. See : https://www.debian.org/doc/debian-policy/ch-archive.html#s-subsections
+  pub section: Option<String>,
+  /// Change the priority of the Debian Package. By default, it is set to `optional`.
+  /// Recognized Priorities as of now are :  `required`, `important`, `standard`, `optional`, `extra`
+  pub priority: Option<String>,
+  /// Path of the uncompressed Changelog file, to be stored at /usr/share/doc/package-name/changelog.gz. See
+  /// https://www.debian.org/doc/debian-policy/ch-docs.html#changelog-files-and-release-notes
+  pub changelog: Option<PathBuf>,
 }
 
 /// The Linux AppImage bundle settings.
@@ -886,17 +894,14 @@ impl Settings {
     }
   }
 
+  /// Returns the bundle license.
+  pub fn license(&self) -> Option<String> {
+    self.bundle_settings.license.clone()
+  }
+
   /// Returns the bundle license file.
   pub fn license_file(&self) -> Option<PathBuf> {
-    self.bundle_settings.license_file.clone().or_else(|| {
-      self.bundle_settings.license.as_deref().map(|l| {
-        let p = self
-          .project_out_directory()
-          .join(format!("{}-license", self.bundle_identifier()));
-        std::fs::write(&p, l).expect("failed to write license to a temp file");
-        p
-      })
-    })
+    self.bundle_settings.license_file.clone()
   }
 
   /// Returns the package's homepage URL, defaulting to "" if not defined.

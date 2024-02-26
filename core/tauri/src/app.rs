@@ -845,7 +845,7 @@ macro_rules! shared_app_impl {
       /// Listen to an event on this app only once.
       ///
       /// See [`Self::listen`] for more information.
-      pub fn once<F>(&self, event: impl Into<String>, handler: F)
+      pub fn once<F>(&self, event: impl Into<String>, handler: F) -> EventId
       where
         F: FnOnce(Event) + Send + 'static,
       {
@@ -1002,7 +1002,7 @@ impl<R: Runtime> App<R> {
   /// }
   /// ```
   #[cfg(desktop)]
-  pub fn run_iteration<F: FnMut(&AppHandle<R>, RunEvent)>(&mut self, mut callback: F) {
+  pub fn run_iteration<F: FnMut(&AppHandle<R>, RunEvent) + 'static>(&mut self, mut callback: F) {
     let manager = self.manager.clone();
     let app_handle = self.handle().clone();
 
