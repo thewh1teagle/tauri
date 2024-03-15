@@ -1,5 +1,5 @@
 // Copyright 2016-2019 Cargo-Bundle developers <https://github.com/burtonageo/cargo-bundle>
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -24,7 +24,6 @@ use std::{
 };
 
 use anyhow::Context;
-use log::info;
 use zip::write::FileOptions;
 
 // Build update
@@ -78,7 +77,7 @@ fn bundle_update_macos(bundles: &[Bundle]) -> crate::Result<Vec<PathBuf>> {
     create_tar(source_path, &osx_archived_path)
       .with_context(|| "Failed to tar.gz update directory")?;
 
-    info!(action = "Bundling"; "{} ({})", osx_archived, display_path(&osx_archived_path));
+    log::info!(action = "Bundling"; "{} ({})", osx_archived, display_path(&osx_archived_path));
 
     Ok(vec![osx_archived_path])
   } else {
@@ -113,7 +112,7 @@ fn bundle_update_linux(bundles: &[Bundle]) -> crate::Result<Vec<PathBuf>> {
     create_tar(source_path, &appimage_archived_path)
       .with_context(|| "Failed to tar.gz update directory")?;
 
-    info!(action = "Bundling"; "{} ({})", appimage_archived, display_path(&appimage_archived_path));
+    log::info!(action = "Bundling"; "{} ({})", appimage_archived, display_path(&appimage_archived_path));
 
     Ok(vec![appimage_archived_path])
   } else {
@@ -197,7 +196,7 @@ fn bundle_update_windows(settings: &Settings, bundles: &[Bundle]) -> crate::Resu
         });
     let archived_path = archived_path.with_extension(format!("{}.zip", bundle_name));
 
-    info!(action = "Bundling"; "{}", display_path(&archived_path));
+    log::info!(action = "Bundling"; "{}", display_path(&archived_path));
 
     // Create our gzip file
     create_zip(&source_path, &archived_path).with_context(|| "Failed to zip update bundle")?;

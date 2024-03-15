@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -146,7 +146,7 @@ fn get_response<R: Runtime>(
           .body(response.body.to_vec().into())?
       }
       Err(e) => {
-        tauri_utils::debug_eprintln!("Failed to request {}: {}", url.as_str(), e);
+        log::error!("Failed to request {}: {}", url.as_str(), e);
         return Err(Box::new(e));
       }
     }

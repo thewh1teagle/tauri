@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -131,8 +131,8 @@ fn with_head<F: FnOnce(&NodeRef)>(document: &NodeRef, f: F) {
 }
 
 fn inject_nonce(document: &NodeRef, selector: &str, token: &str) {
-  if let Ok(scripts) = document.select(selector) {
-    for target in scripts {
+  if let Ok(elements) = document.select(selector) {
+    for target in elements {
       let node = target.as_node();
       let element = node.as_element().unwrap();
 
@@ -234,7 +234,16 @@ impl Default for IsolationSide {
 #[cfg(feature = "isolation")]
 pub fn inject_codegen_isolation_script(document: &NodeRef) {
   with_head(document, |head| {
-    let script = NodeRef::new_element(QualName::new(None, ns!(html), "script".into()), None);
+    let script = NodeRef::new_element(
+      QualName::new(None, ns!(html), "script".into()),
+      vec![(
+        ExpandedName::new(ns!(), LocalName::from("nonce")),
+        Attribute {
+          prefix: None,
+          value: SCRIPT_NONCE_TOKEN.into(),
+        },
+      )],
+    );
     script.append(NodeRef::new_text(
       IsolationJavascriptCodegen {}
         .render_default(&Default::default())

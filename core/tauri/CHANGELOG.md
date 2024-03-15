@@ -1,5 +1,147 @@
 # Changelog
 
+## \[2.0.0-beta.11]
+
+### New Features
+
+- [`490a6b424`](https://www.github.com/tauri-apps/tauri/commit/490a6b424e81714524150aef96fbf6cf7004b940)([#9147](https://www.github.com/tauri-apps/tauri/pull/9147)) The `Assets` trait now include a `setup` method that lets you run initialization code for your custom asset provider.
+
+### Bug Fixes
+
+- [`85de230f3`](https://www.github.com/tauri-apps/tauri/commit/85de230f313da81cbbd061e66e8de64e5b33104c)([#9144](https://www.github.com/tauri-apps/tauri/pull/9144)) Fix old JS listeners being dropped on page load after it was possible to create new listeners.
+- [`e673854c8`](https://www.github.com/tauri-apps/tauri/commit/e673854c8333cb8a8d298471737293f17ec5a3ee)([#9133](https://www.github.com/tauri-apps/tauri/pull/9133)) Fixes capability remote domain not allowing subpaths, query parameters and hash when those values are empty.
+
+### Dependencies
+
+- Upgraded to `tauri-macros@2.0.0-beta.9`
+- Upgraded to `tauri-utils@2.0.0-beta.9`
+- Upgraded to `tauri-build@2.0.0-beta.9`
+- Upgraded to `tauri-runtime@2.0.0-beta.9`
+- Upgraded to `tauri-runtime-wry@2.0.0-beta.9`
+
+### Breaking Changes
+
+- [`490a6b424`](https://www.github.com/tauri-apps/tauri/commit/490a6b424e81714524150aef96fbf6cf7004b940)([#9147](https://www.github.com/tauri-apps/tauri/pull/9147)) The `Context` struct and the `Assets` trait now takes a `R: Runtime` generic.
+- [`ba0206d8a`](https://www.github.com/tauri-apps/tauri/commit/ba0206d8a30a9b43ec5090dcaabd1a23baa1420c)([#9141](https://www.github.com/tauri-apps/tauri/pull/9141)) `Context::assets` now returns `&dyn Assets` instead of `&A` generic.
+- [`ba0206d8a`](https://www.github.com/tauri-apps/tauri/commit/ba0206d8a30a9b43ec5090dcaabd1a23baa1420c)([#9141](https://www.github.com/tauri-apps/tauri/pull/9141)) The `Context` type no longer uses the `<A: Assets>` generic so the assets implementation can be swapped with `Context::assets_mut`.
+- [`490a6b424`](https://www.github.com/tauri-apps/tauri/commit/490a6b424e81714524150aef96fbf6cf7004b940)([#9147](https://www.github.com/tauri-apps/tauri/pull/9147)) Removed `Context::assets_mut` and added `Context::set_assets`.
+- [`db0a24a97`](https://www.github.com/tauri-apps/tauri/commit/db0a24a973191752aeecfbd556faa254b0f17e79)([#9132](https://www.github.com/tauri-apps/tauri/pull/9132)) Use the image crate for `tauri::image::Image` and remove the `from_png_bytes` and `from_ico_bytes` APIs.
+
+## \[2.0.0-beta.10]
+
+### New Features
+
+- [`3e472d0af`](https://www.github.com/tauri-apps/tauri/commit/3e472d0afcd67545dd6d9f18d304580a3b2759a8)([#9115](https://www.github.com/tauri-apps/tauri/pull/9115)) Added `CapabilityBuilder::platform` to link the runtime capability with a specific platform.
+
+### Enhancements
+
+- [`3e472d0af`](https://www.github.com/tauri-apps/tauri/commit/3e472d0afcd67545dd6d9f18d304580a3b2759a8)([#9115](https://www.github.com/tauri-apps/tauri/pull/9115)) Changed the permission and capability platforms to be optional.
+- [`9dc9ca6e3`](https://www.github.com/tauri-apps/tauri/commit/9dc9ca6e38be62ef2746c7a4c2b77b2d67c0d998)([#9113](https://www.github.com/tauri-apps/tauri/pull/9113)) Added `tauri::dev()` to determine whether we are running in development mode or not.
+
+### Bug Fixes
+
+- [`5541aafef`](https://www.github.com/tauri-apps/tauri/commit/5541aafef33113bc292558ba125e685135aabab4)([#9107](https://www.github.com/tauri-apps/tauri/pull/9107)) Fix `emit` and `emit_to` (when used with `EventTarget::Any`) always skipping the webview listeners.
+- [`80c12ead4`](https://www.github.com/tauri-apps/tauri/commit/80c12ead4655af91f08046f19c2d478a4cbf94cd)([#9121](https://www.github.com/tauri-apps/tauri/pull/9121)) Fix regression on IPC response when using a channel to return objects.
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.8`
+- Upgraded to `tauri-runtime@2.0.0-beta.8`
+- Upgraded to `tauri-runtime-wry@2.0.0-beta.8`
+- Upgraded to `tauri-macros@2.0.0-beta.8`
+- Upgraded to `tauri-build@2.0.0-beta.8`
+
+### Breaking Changes
+
+- [`4ef17d083`](https://www.github.com/tauri-apps/tauri/commit/4ef17d08336a2e0df4a7ef9adea746d7419710b6)([#9116](https://www.github.com/tauri-apps/tauri/pull/9116)) The ACL configuration for remote URLs now uses the URLPattern standard instead of glob patterns.
+- [`ed48e2b3c`](https://www.github.com/tauri-apps/tauri/commit/ed48e2b3c7fa914e4c9af432c02b8154f872c68a)([#9122](https://www.github.com/tauri-apps/tauri/pull/9122)) Expose `tauri::image` module to export the `JsImage` type and removed the `Image` root re-export.
+
+## \[2.0.0-beta.9]
+
+### New Features
+
+- [`46de49aaa`](https://www.github.com/tauri-apps/tauri/commit/46de49aaad4a148fafc31d591be0e2ed12256507)([#9059](https://www.github.com/tauri-apps/tauri/pull/9059)) Added `set_auto_resize` method for the webview.
+- [`d1e77acd8`](https://www.github.com/tauri-apps/tauri/commit/d1e77acd8dfdf554b90b542513a58a2de1ef2360)([#9011](https://www.github.com/tauri-apps/tauri/pull/9011)) Add a new `Image` type in Rust and JS.
+
+### Enhancements
+
+- [`a77be9747`](https://www.github.com/tauri-apps/tauri/commit/a77be9747443ffc29c34160b55893483bb5f0d74)([#9038](https://www.github.com/tauri-apps/tauri/pull/9038)) Fallback to the postMessage IPC interface if we cannot reach the IPC custom protocol.
+- [`e62ca4ee9`](https://www.github.com/tauri-apps/tauri/commit/e62ca4ee95f4308a6ad128d0f100c85634e28223)([#9070](https://www.github.com/tauri-apps/tauri/pull/9070)) Added a mechanism to preserve channel message order.
+- [`03098b531`](https://www.github.com/tauri-apps/tauri/commit/03098b531562e4d58ab12ad9da2acb1eb3480497)([#9036](https://www.github.com/tauri-apps/tauri/pull/9036)) `Manager::add_capability` now allows adding a dynamically defined capability instead of only relying on static strings.
+- [`b5c743276`](https://www.github.com/tauri-apps/tauri/commit/b5c7432769b84ffe22db721dcfc6af218026f5d4)([#9086](https://www.github.com/tauri-apps/tauri/pull/9086)) Use a strict content security policy on the isolation pattern iframe.
+- [`46de49aaa`](https://www.github.com/tauri-apps/tauri/commit/46de49aaad4a148fafc31d591be0e2ed12256507)([#9059](https://www.github.com/tauri-apps/tauri/pull/9059)) When using the `unstable` feature flag, `WebviewWindow` will internally use the child webview interface for flexibility.
+
+### Bug Fixes
+
+- [`86fa339de`](https://www.github.com/tauri-apps/tauri/commit/86fa339de7b176efafa9b3e89f94dcad5fcd03da)([#9071](https://www.github.com/tauri-apps/tauri/pull/9071)) Fix compile time error in context generation when using `app.windows.windowEffects.color`
+- [`947a50b8e`](https://www.github.com/tauri-apps/tauri/commit/947a50b8e28379c452c32eddc3e0101870e50055)([#9049](https://www.github.com/tauri-apps/tauri/pull/9049)) Fix `tauri migrate` for http plugin ACL.
+- [`fe18012d3`](https://www.github.com/tauri-apps/tauri/commit/fe18012d30d1d8b3ffa10c8e321710eba644ef94)([#9072](https://www.github.com/tauri-apps/tauri/pull/9072)) Resolve symlinks on the filesystem scope check.
+- [`6c0683224`](https://www.github.com/tauri-apps/tauri/commit/6c068322460300e9d56a4fac5b018d4c437daa9e)([#9068](https://www.github.com/tauri-apps/tauri/pull/9068)) Fixes scope resolution grouping scopes for all windows.
+
+### Dependencies
+
+- Upgraded to `tauri-build@2.0.0-beta.7`
+- Upgraded to `tauri-utils@2.0.0-beta.7`
+- Upgraded to `tauri-runtime@2.0.0-beta.7`
+- Upgraded to `tauri-runtime-wry@2.0.0-beta.7`
+- Upgraded to `tauri-macros@2.0.0-beta.7`
+
+### Breaking Changes
+
+- [`d1e77acd8`](https://www.github.com/tauri-apps/tauri/commit/d1e77acd8dfdf554b90b542513a58a2de1ef2360)([#9011](https://www.github.com/tauri-apps/tauri/pull/9011)) Renamed `icon-ico` and `icon-png` feature flags to `image-ico` and `image-png` respectively
+- [`720357fd5`](https://www.github.com/tauri-apps/tauri/commit/720357fd5cd1fefef8485077dfb116ee39ef4ab4)([#9104](https://www.github.com/tauri-apps/tauri/pull/9104)) Removed `tauri::path::Result` and `tauri::path::Error` which were merely an unintentional re-export of `tauri::Result` and `tauri::Error` so use those instead.
+- [`6c0683224`](https://www.github.com/tauri-apps/tauri/commit/6c068322460300e9d56a4fac5b018d4c437daa9e)([#9068](https://www.github.com/tauri-apps/tauri/pull/9068)) The `allows` and `denies` methods from `ipc::ScopeValue`, `ipc::CommandScope` and `ipc::GlobalScope` now returns `&Vec<Arc<T>>` instead of `&Vec<T>`.
+- [`d1e77acd8`](https://www.github.com/tauri-apps/tauri/commit/d1e77acd8dfdf554b90b542513a58a2de1ef2360)([#9011](https://www.github.com/tauri-apps/tauri/pull/9011)) Removed `Context::default_window_icon_mut` and `Context::tray_icon_mut`, use `Context::set_default_window_icon` and `Context::set_tray_icon` instead. Also changed `Context::set_tray_icon` to accept `Option<T>`.
+- [`d1e77acd8`](https://www.github.com/tauri-apps/tauri/commit/d1e77acd8dfdf554b90b542513a58a2de1ef2360)([#9011](https://www.github.com/tauri-apps/tauri/pull/9011)) Removed `Icon` enum, use the new `Image` type instead. All APIs that previously accepted `Icon` have changed to accept `Image` instead.
+
+## \[2.0.0-beta.8]
+
+### New Features
+
+- [`d7f56fef`](https://www.github.com/tauri-apps/tauri/commit/d7f56fef85cac3af4e2dbac1eac40e5567b1f160)([#9014](https://www.github.com/tauri-apps/tauri/pull/9014)) Allow defining a permission that only applies to a set of target platforms via the `platforms` configuration option.
+
+### Bug Fixes
+
+- [`e1d5b790`](https://www.github.com/tauri-apps/tauri/commit/e1d5b7906369a40df19e8ee86c56f90a27d6357c)([#8995](https://www.github.com/tauri-apps/tauri/pull/8995)) Fixes capability webview label check.
+- [`222a96b7`](https://www.github.com/tauri-apps/tauri/commit/222a96b74b145fb48d3f0c109897962d56fae57a)([#8999](https://www.github.com/tauri-apps/tauri/pull/8999)) Fixes `Window::add_child` deadlock.
+- [`e4463f08`](https://www.github.com/tauri-apps/tauri/commit/e4463f08145c044bd37dc1c6f5f39e6a572ace3e)([#8930](https://www.github.com/tauri-apps/tauri/pull/8930)) Clear JS event listeneres on page load, which fixes zombie listeners when the page reloads.
+- [`222a96b7`](https://www.github.com/tauri-apps/tauri/commit/222a96b74b145fb48d3f0c109897962d56fae57a)([#8999](https://www.github.com/tauri-apps/tauri/pull/8999)) Fixes `Webview::reparent` not updating the webview parent window reference.
+
+### Dependencies
+
+- Upgraded to `tauri-build@2.0.0-beta.6`
+- Upgraded to `tauri-utils@2.0.0-beta.6`
+- Upgraded to `tauri-runtime-wry@2.0.0-beta.6`
+- Upgraded to `tauri-runtime@2.0.0-beta.6`
+- Upgraded to `tauri-macros@2.0.0-beta.6`
+
+### Breaking Changes
+
+- [`3657ad82`](https://www.github.com/tauri-apps/tauri/commit/3657ad82f88ce528551d032d521c52eed3f396b4)([#9008](https://www.github.com/tauri-apps/tauri/pull/9008)) Allow defining permissions for the application commands via `tauri_build::Attributes::app_manifest`.
+
+### Breaking Changes
+
+- [`b9e6a018`](https://www.github.com/tauri-apps/tauri/commit/b9e6a01879d9233040f3d3fab11c59e70563da7e)([#8937](https://www.github.com/tauri-apps/tauri/pull/8937)) The `custom-protocol` Cargo feature is no longer required on your application and is now ignored. To check if running on production, use `#[cfg(not(dev))]` instead of `#[cfg(feature = "custom-protocol")]`.
+
+## \[2.0.0-beta.7]
+
+### Enhancements
+
+- [`bc5b5e67`](https://www.github.com/tauri-apps/tauri/commit/bc5b5e671a546512f823f1c157421b4c3311dfc0)([#8984](https://www.github.com/tauri-apps/tauri/pull/8984)) Do not include a CSP tag in the application HTML and rely on the custom protocol response header instead.
+
+### Bug Fixes
+
+- [`6cb601d4`](https://www.github.com/tauri-apps/tauri/commit/6cb601d42e2af75aa818371b8b8f7d5b2e77dc90)([#8983](https://www.github.com/tauri-apps/tauri/pull/8983)) Convert the command name to camelCase when executing a mobile plugin command.
+- [`60bf11ab`](https://www.github.com/tauri-apps/tauri/commit/60bf11abcbec8d0362aa256e2293985bfd62620f)([#8986](https://www.github.com/tauri-apps/tauri/pull/8986)) Export `ProgressBarStatus`, regression introduced in `2.0.0-beta.4`
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.5`
+- Upgraded to `tauri-runtime@2.0.0-beta.5`
+- Upgraded to `tauri-runtime-wry@2.0.0-beta.5`
+- Upgraded to `tauri-macros@2.0.0-beta.5`
+- Upgraded to `tauri-build@2.0.0-beta.5`
+
 ## \[2.0.0-beta.6]
 
 ### Bug Fixes

@@ -1,5 +1,55 @@
 # Changelog
 
+## \[2.0.0-beta.9]
+
+### Breaking Changes
+
+- [`490a6b424`](https://www.github.com/tauri-apps/tauri/commit/490a6b424e81714524150aef96fbf6cf7004b940)([#9147](https://www.github.com/tauri-apps/tauri/pull/9147)) Removed the `assets::Assets` trait which is now part of the `tauri` crate.
+
+## \[2.0.0-beta.8]
+
+### Enhancements
+
+- [`3e472d0af`](https://www.github.com/tauri-apps/tauri/commit/3e472d0afcd67545dd6d9f18d304580a3b2759a8)([#9115](https://www.github.com/tauri-apps/tauri/pull/9115)) Changed the permission and capability platforms to be optional.
+
+### Breaking Changes
+
+- [`4ef17d083`](https://www.github.com/tauri-apps/tauri/commit/4ef17d08336a2e0df4a7ef9adea746d7419710b6)([#9116](https://www.github.com/tauri-apps/tauri/pull/9116)) The ACL configuration for remote URLs now uses the URLPattern standard instead of glob patterns.
+
+## \[2.0.0-beta.7]
+
+### Bug Fixes
+
+- [`86fa339de`](https://www.github.com/tauri-apps/tauri/commit/86fa339de7b176efafa9b3e89f94dcad5fcd03da)([#9071](https://www.github.com/tauri-apps/tauri/pull/9071)) Fix compile time error in context generation when using `app.windows.windowEffects.color`
+- [`6c0683224`](https://www.github.com/tauri-apps/tauri/commit/6c068322460300e9d56a4fac5b018d4c437daa9e)([#9068](https://www.github.com/tauri-apps/tauri/pull/9068)) Fixes scope resolution grouping scopes for all windows.
+- [`c68218b36`](https://www.github.com/tauri-apps/tauri/commit/c68218b362c417b62e56c7a2b5b32c13fe035a83)([#8990](https://www.github.com/tauri-apps/tauri/pull/8990)) Fix `BundleTarget::to_vec` returning an empty vec for `BundleTarget::All` variant.
+- [`c68218b36`](https://www.github.com/tauri-apps/tauri/commit/c68218b362c417b62e56c7a2b5b32c13fe035a83)([#8990](https://www.github.com/tauri-apps/tauri/pull/8990)) Add `BundleType::all` method to return all possible `BundleType` variants.
+
+### Breaking Changes
+
+- [`9aa0d6e95`](https://www.github.com/tauri-apps/tauri/commit/9aa0d6e959269a9d99ff474e7f12bd397ea75fcd)([#9069](https://www.github.com/tauri-apps/tauri/pull/9069)) Removed `debug_eprintln!` and `consume_unused_variable` macros.
+- [`bb23511ea`](https://www.github.com/tauri-apps/tauri/commit/bb23511ea80bcaffbdebf057301e463fff268c90)([#9079](https://www.github.com/tauri-apps/tauri/pull/9079)) Changed `CapabiltyFile::List` enum variant to be a tuple-struct and added `CapabiltyFile::NamedList`. This allows more flexibility when parsing capabilties from JSON files.
+
+## \[2.0.0-beta.6]
+
+### New Features
+
+- [`d7f56fef`](https://www.github.com/tauri-apps/tauri/commit/d7f56fef85cac3af4e2dbac1eac40e5567b1f160)([#9014](https://www.github.com/tauri-apps/tauri/pull/9014)) Allow defining a permission that only applies to a set of target platforms via the `platforms` configuration option.
+
+### Enhancements
+
+- [`04440edc`](https://www.github.com/tauri-apps/tauri/commit/04440edce870f9d06055616034941d79443d5a87)([#9019](https://www.github.com/tauri-apps/tauri/pull/9019)) Changed plugin markdown docs generation to table format.
+
+### Breaking Changes
+
+- [`3657ad82`](https://www.github.com/tauri-apps/tauri/commit/3657ad82f88ce528551d032d521c52eed3f396b4)([#9008](https://www.github.com/tauri-apps/tauri/pull/9008)) Allow defining permissions for the application commands via `tauri_build::Attributes::app_manifest`.
+
+## \[2.0.0-beta.5]
+
+### Enhancements
+
+- [`bc5b5e67`](https://www.github.com/tauri-apps/tauri/commit/bc5b5e671a546512f823f1c157421b4c3311dfc0)([#8984](https://www.github.com/tauri-apps/tauri/pull/8984)) Do not include a CSP tag in the application HTML and rely on the custom protocol response header instead.
+
 ## \[2.0.0-beta.4]
 
 ### Breaking Changes

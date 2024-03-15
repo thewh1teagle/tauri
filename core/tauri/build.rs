@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -137,6 +137,16 @@ const PLUGINS: &[(&str, &[(&str, bool)])] = &[
       ("app_hide", false),
     ],
   ),
+  (
+    "image",
+    &[
+      ("new", true),
+      ("from_bytes", true),
+      ("from_path", true),
+      ("rgba", true),
+      ("size", true),
+    ],
+  ),
   ("resources", &[("close", true)]),
   (
     "menu",
@@ -169,6 +179,8 @@ const PLUGINS: &[(&str, &[(&str, bool)])] = &[
     "tray",
     &[
       ("new", false),
+      ("get_by_id", false),
+      ("remove_by_id", false),
       ("set_icon", false),
       ("set_menu", false),
       ("set_tooltip", false),
@@ -205,20 +217,17 @@ fn alias(alias: &str, has_feature: bool) {
 }
 
 fn main() {
-  alias("custom_protocol", has_feature("custom-protocol"));
-  alias("dev", !has_feature("custom-protocol"));
+  let custom_protocol = has_feature("custom-protocol");
+  let dev = !custom_protocol;
+  alias("custom_protocol", custom_protocol);
+  alias("dev", dev);
+
+  println!("cargo:dev={}", dev);
 
   let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
   let mobile = target_os == "ios" || target_os == "android";
   alias("desktop", !mobile);
   alias("mobile", mobile);
-
-  alias(
-    "ipc_custom_protocol",
-    target_os != "android" && 
-    (target_os != "linux" || has_feature("linux-ipc-protocol")) && 
-    !has_feature("force-ipc-v1-protocol"),
-  );
 
   let out_dir = PathBuf::from(var("OUT_DIR").unwrap());
 
@@ -308,7 +317,7 @@ fn main() {
 }
 
 fn define_permissions(out_dir: &Path) {
-  let license_header = r#"# Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+  let license_header = r#"# Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-License-Identifier: MIT
 "#;
@@ -323,6 +332,7 @@ fn define_permissions(out_dir: &Path) {
       &commands_dir,
       &commands.iter().map(|(cmd, _)| *cmd).collect::<Vec<_>>(),
       license_header,
+      false,
     );
     let default_permissions = commands
       .iter()
@@ -356,6 +366,7 @@ permissions = [{default_permissions}]
         .to_string_lossy(),
       &format!("tauri:{plugin}"),
       out_dir,
+      |_| true,
     )
     .unwrap_or_else(|e| panic!("failed to define permissions for {plugin}: {e}"));
 

@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -11,6 +11,9 @@ use tauri_runtime::{
   window::dpi::{PhysicalPosition, PhysicalSize},
 };
 pub use tauri_utils::{config::Color, WindowEffect as Effect, WindowEffectState as EffectState};
+
+#[cfg(desktop)]
+pub use crate::runtime::ProgressBarStatus;
 
 use crate::{
   app::AppHandle,
@@ -30,12 +33,13 @@ use crate::{
 };
 #[cfg(desktop)]
 use crate::{
+  image::Image,
   menu::{ContextMenu, Menu, MenuId},
   runtime::{
     window::dpi::{Position, Size},
     UserAttentionType,
   },
-  CursorIcon, Icon,
+  CursorIcon,
 };
 
 use serde::Serialize;
@@ -401,7 +405,6 @@ tauri::Builder::default()
       let window = app_manager.window.attach_window(
         self.manager.app_handle().clone(),
         detached_window.clone(),
-        detached_window.webview.is_some(),
         #[cfg(desktop)]
         window_menu,
       );
@@ -629,8 +632,8 @@ impl<'a, R: Runtime, M: Manager<R>> WindowBuilder<'a, R, M> {
   }
 
   /// Sets the window icon.
-  pub fn icon(mut self, icon: Icon) -> crate::Result<Self> {
-    self.window_builder = self.window_builder.icon(icon.try_into()?)?;
+  pub fn icon(mut self, icon: Image<'a>) -> crate::Result<Self> {
+    self.window_builder = self.window_builder.icon(icon.into())?;
     Ok(self)
   }
 
@@ -862,8 +865,6 @@ pub struct Window<R: Runtime> {
   // The menu set for this window
   #[cfg(desktop)]
   pub(crate) menu: Arc<std::sync::Mutex<Option<WindowMenu<R>>>>,
-  /// Whether this window is a Webview window (hosts only a single webview) or a container for multiple webviews
-  pub(crate) is_webview_window: bool,
 }
 
 impl<R: Runtime> std::fmt::Debug for Window<R> {
@@ -872,7 +873,6 @@ impl<R: Runtime> std::fmt::Debug for Window<R> {
       .field("window", &self.window)
       .field("manager", &self.manager)
       .field("app_handle", &self.app_handle)
-      .field("is_webview_window", &self.is_webview_window)
       .finish()
   }
 }
@@ -893,7 +893,6 @@ impl<R: Runtime> Clone for Window<R> {
       app_handle: self.app_handle.clone(),
       #[cfg(desktop)]
       menu: self.menu.clone(),
-      is_webview_window: self.is_webview_window,
     }
   }
 }
@@ -948,7 +947,6 @@ impl<R: Runtime> Window<R> {
     window: DetachedWindow<EventLoopMessage, R>,
     app_handle: AppHandle<R>,
     #[cfg(desktop)] menu: Option<WindowMenu<R>>,
-    is_webview_window: bool,
   ) -> Self {
     Self {
       window,
@@ -956,7 +954,6 @@ impl<R: Runtime> Window<R> {
       app_handle,
       #[cfg(desktop)]
       menu: Arc::new(std::sync::Mutex::new(menu)),
-      is_webview_window,
     }
   }
 
@@ -978,7 +975,17 @@ impl<R: Runtime> Window<R> {
     position: P,
     size: S,
   ) -> crate::Result<Webview<R>> {
-    webview_builder.build(self.clone(), position.into(), size.into())
+    use std::sync::mpsc::channel;
+
+    let (tx, rx) = channel();
+    let position = position.into();
+    let size = size.into();
+    let window_ = self.clone();
+    self.run_on_main_thread(move || {
+      let res = webview_builder.build(window_, position, size);
+      tx.send(res.map_err(Into::into)).unwrap();
+    })?;
+    rx.recv().unwrap()
   }
 
   /// List of webviews associated with this window.
@@ -991,6 +998,10 @@ impl<R: Runtime> Window<R> {
       .filter(|w| w.window_label() == self.label())
       .cloned()
       .collect()
+  }
+
+  pub(crate) fn is_webview_window(&self) -> bool {
+    self.webviews().iter().all(|w| w.label() == self.label())
   }
 
   /// Runs the given closure on the main thread.
@@ -1563,7 +1574,7 @@ impl<R: Runtime> Window<R> {
       .map_err(Into::into)
   }
 
-  /// Determines if this window's native minize button should be enabled.
+  /// Determines if this window's native minimize button should be enabled.
   ///
   /// ## Platform-specific
   ///
@@ -1802,11 +1813,11 @@ tauri::Builder::default()
   }
 
   /// Sets this window' icon.
-  pub fn set_icon(&self, icon: Icon) -> crate::Result<()> {
+  pub fn set_icon(&self, icon: Image<'_>) -> crate::Result<()> {
     self
       .window
       .dispatcher
-      .set_icon(icon.try_into()?)
+      .set_icon(icon.into())
       .map_err(Into::into)
   }
 
@@ -1939,7 +1950,7 @@ tauri::Builder::default()
 #[derive(serde::Deserialize)]
 pub struct ProgressBarState {
   /// The progress bar status.
-  pub status: Option<crate::runtime::ProgressBarStatus>,
+  pub status: Option<ProgressBarStatus>,
   /// The progress bar progress. This can be a value ranging from `0` to `100`
   pub progress: Option<u64>,
 }

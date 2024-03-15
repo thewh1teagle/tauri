@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -565,17 +565,17 @@ tauri::Builder::default()
       }));
     }
 
-    if let Some(on_page_load_handler) = self.on_page_load_handler.take() {
-      let label = pending.label.clone();
-      let manager = manager.manager_owned();
-      pending
-        .on_page_load_handler
-        .replace(Box::new(move |url, event| {
-          if let Some(w) = manager.get_webview(&label) {
-            on_page_load_handler(w, PageLoadPayload { url: &url, event });
+    let label_ = pending.label.clone();
+    let manager_ = manager.manager_owned();
+    pending
+      .on_page_load_handler
+      .replace(Box::new(move |url, event| {
+        if let Some(w) = manager_.get_webview(&label_) {
+          if let Some(handler) = self.on_page_load_handler.as_ref() {
+            handler(w, PageLoadPayload { url: &url, event });
           }
-        }));
-    }
+        }
+      }));
 
     manager.manager().webview.prepare_webview(
       manager,
@@ -893,42 +893,27 @@ impl<R: Runtime> Webview<R> {
 
   /// Closes this webview.
   pub fn close(&self) -> crate::Result<()> {
-    let window = self.window();
-    if window.is_webview_window {
-      window.close()
-    } else {
-      self.webview.dispatcher.close()?;
-      self.manager().on_webview_close(self.label());
-      Ok(())
-    }
+    self.webview.dispatcher.close()?;
+    self.manager().on_webview_close(self.label());
+    Ok(())
   }
 
   /// Resizes this webview.
   pub fn set_size<S: Into<Size>>(&self, size: S) -> crate::Result<()> {
-    let window = self.window();
-    if window.is_webview_window {
-      window.set_size(size.into())
-    } else {
-      self
-        .webview
-        .dispatcher
-        .set_size(size.into())
-        .map_err(Into::into)
-    }
+    self
+      .webview
+      .dispatcher
+      .set_size(size.into())
+      .map_err(Into::into)
   }
 
   /// Sets this webviews's position.
   pub fn set_position<Pos: Into<Position>>(&self, position: Pos) -> crate::Result<()> {
-    let window = self.window();
-    if window.is_webview_window {
-      window.set_position(position.into())
-    } else {
-      self
-        .webview
-        .dispatcher
-        .set_position(position.into())
-        .map_err(Into::into)
-    }
+    self
+      .webview
+      .dispatcher
+      .set_position(position.into())
+      .map_err(Into::into)
   }
 
   /// Focus the webview.
@@ -938,11 +923,26 @@ impl<R: Runtime> Webview<R> {
 
   /// Move the webview to the given window.
   pub fn reparent(&self, window: &Window<R>) -> crate::Result<()> {
-    let current_window = self.window();
-    if !current_window.is_webview_window {
-      self.webview.dispatcher.reparent(window.window.id)?;
+    #[cfg(not(feature = "unstable"))]
+    {
+      let current_window = self.window();
+      if current_window.is_webview_window() || window.is_webview_window() {
+        return Err(crate::Error::CannotReparentWebviewWindow);
+      }
     }
+
+    self.webview.dispatcher.reparent(window.window.id)?;
+    *self.window_label.lock().unwrap() = window.label().to_string();
     Ok(())
+  }
+
+  /// Sets whether the webview should automatically grow and shrink its size and position when the parent window resizes.
+  pub fn set_auto_resize(&self, auto_resize: bool) -> crate::Result<()> {
+    self
+      .webview
+      .dispatcher
+      .set_auto_resize(auto_resize)
+      .map_err(Into::into)
   }
 
   /// Returns the webview position.
@@ -950,22 +950,12 @@ impl<R: Runtime> Webview<R> {
   /// - For child webviews, returns the position of the top-left hand corner of the webviews's client area relative to the top-left hand corner of the parent window.
   /// - For webview window, returns the inner position of the window.
   pub fn position(&self) -> crate::Result<PhysicalPosition<i32>> {
-    let window = self.window();
-    if window.is_webview_window {
-      window.inner_position()
-    } else {
-      self.webview.dispatcher.position().map_err(Into::into)
-    }
+    self.webview.dispatcher.position().map_err(Into::into)
   }
 
   /// Returns the physical size of the webviews's client area.
   pub fn size(&self) -> crate::Result<PhysicalSize<u32>> {
-    let window = self.window();
-    if window.is_webview_window {
-      window.inner_size()
-    } else {
-      self.webview.dispatcher.size().map_err(Into::into)
-    }
+    self.webview.dispatcher.size().map_err(Into::into)
   }
 }
 
@@ -1144,20 +1134,19 @@ fn main() {
       Origin::Local
     } else {
       Origin::Remote {
-        url: current_url.to_string(),
+        url: current_url.clone(),
       }
     };
-    let resolved_acl = manager
-      .runtime_authority
-      .lock()
-      .unwrap()
-      .resolve_access(
+    let (resolved_acl, has_app_acl_manifest) = {
+      let runtime_authority = manager.runtime_authority.lock().unwrap();
+      let acl = runtime_authority.resolve_access(
         &request.cmd,
-        message.webview.label(),
         message.webview.window().label(),
+        message.webview.label(),
         &acl_origin,
-      )
-      .cloned();
+      );
+      (acl, runtime_authority.has_app_manifest())
+    };
 
     let mut invoke = Invoke {
       message,
@@ -1165,37 +1154,46 @@ fn main() {
       acl: resolved_acl,
     };
 
-    if let Some((plugin, command_name)) = request.cmd.strip_prefix("plugin:").map(|raw_command| {
+    let plugin_command = request.cmd.strip_prefix("plugin:").map(|raw_command| {
       let mut tokens = raw_command.split('|');
       // safe to unwrap: split always has a least one item
       let plugin = tokens.next().unwrap();
       let command = tokens.next().map(|c| c.to_string()).unwrap_or_default();
       (plugin, command)
-    }) {
-      if request.cmd != crate::ipc::channel::FETCH_CHANNEL_DATA_COMMAND && invoke.acl.is_none() {
-        #[cfg(debug_assertions)]
-        {
-          invoke.resolver.reject(
-            manager
-              .runtime_authority
-              .lock()
-              .unwrap()
-              .resolve_access_message(
-                plugin,
-                &command_name,
-                invoke.message.webview.window().label(),
-                invoke.message.webview.label(),
-                &acl_origin,
-              ),
-          );
-        }
-        #[cfg(not(debug_assertions))]
-        invoke
-          .resolver
-          .reject(format!("Command {} not allowed by ACL", request.cmd));
-        return;
-      }
+    });
 
+    // we only check ACL on plugin commands or if the app defined its ACL manifest
+    if (plugin_command.is_some() || has_app_acl_manifest)
+      && request.cmd != crate::ipc::channel::FETCH_CHANNEL_DATA_COMMAND
+      && invoke.acl.is_none()
+    {
+      #[cfg(debug_assertions)]
+      {
+        let (key, command_name) = plugin_command
+          .clone()
+          .unwrap_or_else(|| (tauri_utils::acl::APP_ACL_KEY, request.cmd.clone()));
+        invoke.resolver.reject(
+          manager
+            .runtime_authority
+            .lock()
+            .unwrap()
+            .resolve_access_message(
+              key,
+              &command_name,
+              invoke.message.webview.window().label(),
+              invoke.message.webview.label(),
+              &acl_origin,
+            ),
+        );
+      }
+      #[cfg(not(debug_assertions))]
+      invoke
+        .resolver
+        .reject(format!("Command {} not allowed by ACL", request.cmd));
+      return;
+    }
+
+    if let Some((plugin, command_name)) = plugin_command {
       invoke.message.command = command_name;
 
       let command = invoke.message.command.clone();
@@ -1296,16 +1294,16 @@ fn main() {
       id,
     ))?;
 
-    listeners.unlisten_js(id);
+    listeners.unlisten_js(event, id);
 
     Ok(())
   }
 
-  pub(crate) fn emit_js(&self, emit_args: &EmitArgs, target: &EventTarget) -> crate::Result<()> {
+  pub(crate) fn emit_js(&self, emit_args: &EmitArgs, ids: &[u32]) -> crate::Result<()> {
     self.eval(&crate::event::emit_js_script(
       self.manager().listeners().function_name(),
       emit_args,
-      &serde_json::to_string(target)?,
+      &serde_json::to_string(ids)?,
     )?)?;
     Ok(())
   }

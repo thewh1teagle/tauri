@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -17,7 +17,6 @@ use tauri_utils::config::FrontendDist;
 #[cfg_attr(docsrs, doc(cfg(feature = "codegen")))]
 #[derive(Debug)]
 pub struct CodegenContext {
-  dev: bool,
   config_path: PathBuf,
   out_file: PathBuf,
   capabilities: Option<Vec<PathBuf>>,
@@ -26,7 +25,6 @@ pub struct CodegenContext {
 impl Default for CodegenContext {
   fn default() -> Self {
     Self {
-      dev: false,
       config_path: PathBuf::from("tauri.conf.json"),
       out_file: PathBuf::from("tauri-build-context.rs"),
       capabilities: None,
@@ -65,14 +63,6 @@ impl CodegenContext {
   #[must_use]
   pub fn out_file(mut self, filename: PathBuf) -> Self {
     self.out_file = filename;
-    self
-  }
-
-  /// Run the codegen in a `dev` context, meaning that Tauri is using a dev server or local file for development purposes,
-  /// usually with the `tauri dev` CLI command.
-  #[must_use]
-  pub fn dev(mut self) -> Self {
-    self.dev = true;
     self
   }
 
@@ -131,13 +121,14 @@ impl CodegenContext {
     );
 
     let code = context_codegen(ContextData {
-      dev: self.dev,
+      dev: crate::dev(),
       config,
       config_parent,
       // it's very hard to have a build script for unit tests, so assume this is always called from
       // outside the tauri crate, making the ::tauri root valid.
       root: quote::quote!(::tauri),
       capabilities: self.capabilities,
+      assets: None,
     })?;
 
     // get the full output file path

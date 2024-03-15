@@ -1,23 +1,17 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
 //! Resolved ACL for runtime usage.
 
-use std::{
-  collections::{hash_map::DefaultHasher, BTreeMap, HashSet},
-  fmt,
-  hash::{Hash, Hasher},
-};
-
-use glob::Pattern;
+use std::{collections::BTreeMap, fmt};
 
 use crate::platform::Target;
 
 use super::{
   capability::{Capability, PermissionEntry},
-  plugin::Manifest,
-  Commands, Error, ExecutionContext, Permission, PermissionSet, Scopes, Value,
+  manifest::Manifest,
+  Commands, Error, ExecutionContext, Permission, PermissionSet, Scopes, Value, APP_ACL_KEY,
 };
 
 /// A key for a scope, used to link a [`ResolvedCommand#structfield.scope`] to the store [`Resolved#structfield.scopes`].
@@ -25,7 +19,7 @@ pub type ScopeKey = u64;
 
 /// Metadata for what referenced a [`ResolvedCommand`].
 #[cfg(debug_assertions)]
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct ResolvedCommandReference {
   /// Identifier of the capability.
   pub capability: String,
@@ -36,29 +30,32 @@ pub struct ResolvedCommandReference {
 /// A resolved command permission.
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct ResolvedCommand {
-  /// The list of capability/permission that referenced this command.
+  /// The execution context of this command.
+  pub context: ExecutionContext,
+  /// The capability/permission that referenced this command.
   #[cfg(debug_assertions)]
-  pub referenced_by: Vec<ResolvedCommandReference>,
+  pub referenced_by: ResolvedCommandReference,
   /// The list of window label patterns that was resolved for this command.
   pub windows: Vec<glob::Pattern>,
   /// The list of webview label patterns that was resolved for this command.
   pub webviews: Vec<glob::Pattern>,
-  /// The reference of the scope that is associated with this command. See [`Resolved#structfield.scopes`].
-  pub scope: Option<ScopeKey>,
+  /// The reference of the scope that is associated with this command. See [`Resolved#structfield.command_scopes`].
+  pub scope_id: Option<ScopeKey>,
 }
 
 impl fmt::Debug for ResolvedCommand {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("ResolvedCommand")
+      .field("context", &self.context)
       .field("windows", &self.windows)
       .field("webviews", &self.webviews)
-      .field("scope", &self.scope)
+      .field("scope_id", &self.scope_id)
       .finish()
   }
 }
 
 /// A resolved scope. Merges all scopes defined for a single command.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ResolvedScope {
   /// Allows something on the command.
   pub allow: Vec<Value>,
@@ -66,23 +63,13 @@ pub struct ResolvedScope {
   pub deny: Vec<Value>,
 }
 
-/// A command key for the map of allowed and denied commands.
-/// Takes into consideration the command name and the execution context.
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub struct CommandKey {
-  /// The full command name.
-  pub name: String,
-  /// The context of the command.
-  pub context: ExecutionContext,
-}
-
 /// Resolved access control list.
 #[derive(Debug, Default)]
 pub struct Resolved {
   /// The commands that are allowed. Map each command with its context to a [`ResolvedCommand`].
-  pub allowed_commands: BTreeMap<CommandKey, ResolvedCommand>,
+  pub allowed_commands: BTreeMap<String, Vec<ResolvedCommand>>,
   /// The commands that are denied. Map each command with its context to a [`ResolvedCommand`].
-  pub denied_commands: BTreeMap<CommandKey, ResolvedCommand>,
+  pub denied_commands: BTreeMap<String, Vec<ResolvedCommand>>,
   /// The store of scopes referenced by a [`ResolvedCommand`].
   pub command_scope: BTreeMap<ScopeKey, ResolvedScope>,
   /// The global scope.
@@ -100,34 +87,43 @@ impl Resolved {
     let mut denied_commands = BTreeMap::new();
 
     let mut current_scope_id = 0;
-    let mut command_scopes = BTreeMap::new();
+    let mut command_scope = BTreeMap::new();
     let mut global_scope: BTreeMap<String, Vec<Scopes>> = BTreeMap::new();
 
     // resolve commands
     for capability in capabilities.values() {
-      if !capability.platforms.contains(&target) {
+      if !capability
+        .platforms
+        .as_ref()
+        .map(|platforms| platforms.contains(&target))
+        .unwrap_or(true)
+      {
         continue;
       }
 
       with_resolved_permissions(
         capability,
         acl,
+        target,
         |ResolvedPermission {
-           plugin_name,
+           key,
            permission_name,
            commands,
            scope,
          }| {
           if commands.allow.is_empty() && commands.deny.is_empty() {
             // global scope
-            global_scope
-              .entry(plugin_name.to_string())
-              .or_default()
-              .push(scope);
+            global_scope.entry(key.to_string()).or_default().push(scope);
           } else {
             let scope_id = if scope.allow.is_some() || scope.deny.is_some() {
               current_scope_id += 1;
-              command_scopes.insert(current_scope_id, scope);
+              command_scope.insert(
+                current_scope_id,
+                ResolvedScope {
+                  allow: scope.allow.unwrap_or_default(),
+                  deny: scope.deny.unwrap_or_default(),
+                },
+              );
               Some(current_scope_id)
             } else {
               None
@@ -136,65 +132,46 @@ impl Resolved {
             for allowed_command in &commands.allow {
               resolve_command(
                 &mut allowed_commands,
-                format!("plugin:{plugin_name}|{allowed_command}"),
+                if key == APP_ACL_KEY {
+                  allowed_command.to_string()
+                } else {
+                  format!("plugin:{key}|{allowed_command}")
+                },
                 capability,
                 scope_id,
                 #[cfg(debug_assertions)]
                 permission_name.to_string(),
-              );
+              )?;
             }
 
             for denied_command in &commands.deny {
               resolve_command(
                 &mut denied_commands,
-                format!("plugin:{plugin_name}|{denied_command}"),
+                if key == APP_ACL_KEY {
+                  denied_command.to_string()
+                } else {
+                  format!("plugin:{key}|{denied_command}")
+                },
                 capability,
                 scope_id,
                 #[cfg(debug_assertions)]
                 permission_name.to_string(),
-              );
+              )?;
             }
           }
+
+          Ok(())
         },
       )?;
     }
 
-    // resolve scopes
-    let mut resolved_scopes = BTreeMap::new();
-
-    for allowed in allowed_commands.values_mut() {
-      if !allowed.scope.is_empty() {
-        allowed.scope.sort();
-
-        let mut hasher = DefaultHasher::new();
-        allowed.scope.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        allowed.resolved_scope_key.replace(hash);
-
-        let resolved_scope = ResolvedScope {
-          allow: allowed
-            .scope
-            .iter()
-            .flat_map(|s| command_scopes.get(s).unwrap().allow.clone())
-            .flatten()
-            .collect(),
-          deny: allowed
-            .scope
-            .iter()
-            .flat_map(|s| command_scopes.get(s).unwrap().deny.clone())
-            .flatten()
-            .collect(),
-        };
-
-        resolved_scopes.insert(hash, resolved_scope);
-      }
-    }
-
     let global_scope = global_scope
       .into_iter()
-      .map(|(plugin_name, scopes)| {
-        let mut resolved_scope = ResolvedScope::default();
+      .map(|(key, scopes)| {
+        let mut resolved_scope = ResolvedScope {
+          allow: Vec::new(),
+          deny: Vec::new(),
+        };
         for scope in scopes {
           if let Some(allow) = scope.allow {
             resolved_scope.allow.extend(allow);
@@ -203,42 +180,14 @@ impl Resolved {
             resolved_scope.deny.extend(deny);
           }
         }
-        (plugin_name, resolved_scope)
+        (key, resolved_scope)
       })
       .collect();
 
     let resolved = Self {
-      allowed_commands: allowed_commands
-        .into_iter()
-        .map(|(key, cmd)| {
-          Ok((
-            key,
-            ResolvedCommand {
-              #[cfg(debug_assertions)]
-              referenced_by: cmd.referenced_by,
-              windows: parse_glob_patterns(cmd.windows)?,
-              webviews: parse_glob_patterns(cmd.webviews)?,
-              scope: cmd.resolved_scope_key,
-            },
-          ))
-        })
-        .collect::<Result<_, Error>>()?,
-      denied_commands: denied_commands
-        .into_iter()
-        .map(|(key, cmd)| {
-          Ok((
-            key,
-            ResolvedCommand {
-              #[cfg(debug_assertions)]
-              referenced_by: cmd.referenced_by,
-              windows: parse_glob_patterns(cmd.windows)?,
-              webviews: parse_glob_patterns(cmd.webviews)?,
-              scope: cmd.resolved_scope_key,
-            },
-          ))
-        })
-        .collect::<Result<_, Error>>()?,
-      command_scope: resolved_scopes,
+      allowed_commands,
+      denied_commands,
+      command_scope,
       global_scope,
     };
 
@@ -246,8 +195,7 @@ impl Resolved {
   }
 }
 
-fn parse_glob_patterns(raw: HashSet<String>) -> Result<Vec<glob::Pattern>, Error> {
-  let mut raw = raw.into_iter().collect::<Vec<_>>();
+fn parse_glob_patterns(mut raw: Vec<String>) -> Result<Vec<glob::Pattern>, Error> {
   raw.sort();
 
   let mut patterns = Vec::new();
@@ -259,93 +207,92 @@ fn parse_glob_patterns(raw: HashSet<String>) -> Result<Vec<glob::Pattern>, Error
 }
 
 struct ResolvedPermission<'a> {
-  plugin_name: &'a str,
+  key: &'a str,
   permission_name: &'a str,
   commands: Commands,
   scope: Scopes,
 }
 
-fn with_resolved_permissions<F: FnMut(ResolvedPermission<'_>)>(
+fn with_resolved_permissions<F: FnMut(ResolvedPermission<'_>) -> Result<(), Error>>(
   capability: &Capability,
   acl: &BTreeMap<String, Manifest>,
+  target: Target,
   mut f: F,
 ) -> Result<(), Error> {
   for permission_entry in &capability.permissions {
     let permission_id = permission_entry.identifier();
     let permission_name = permission_id.get_base();
 
-    if let Some(plugin_name) = permission_id.get_prefix() {
-      let permissions = get_permissions(plugin_name, permission_name, acl)?;
+    let key = permission_id.get_prefix().unwrap_or(APP_ACL_KEY);
 
-      let mut resolved_scope = Scopes::default();
-      let mut commands = Commands::default();
+    let permissions = get_permissions(key, permission_name, acl)?
+      .into_iter()
+      .filter(|p| {
+        p.platforms
+          .as_ref()
+          .map(|platforms| platforms.contains(&target))
+          .unwrap_or(true)
+      })
+      .collect::<Vec<_>>();
 
-      if let PermissionEntry::ExtendedPermission {
-        identifier: _,
-        scope,
-      } = permission_entry
-      {
-        if let Some(allow) = scope.allow.clone() {
-          resolved_scope
-            .allow
-            .get_or_insert_with(Default::default)
-            .extend(allow);
-        }
-        if let Some(deny) = scope.deny.clone() {
-          resolved_scope
-            .deny
-            .get_or_insert_with(Default::default)
-            .extend(deny);
-        }
+    let mut resolved_scope = Scopes::default();
+    let mut commands = Commands::default();
+
+    if let PermissionEntry::ExtendedPermission {
+      identifier: _,
+      scope,
+    } = permission_entry
+    {
+      if let Some(allow) = scope.allow.clone() {
+        resolved_scope
+          .allow
+          .get_or_insert_with(Default::default)
+          .extend(allow);
       }
-
-      for permission in permissions {
-        if let Some(allow) = permission.scope.allow.clone() {
-          resolved_scope
-            .allow
-            .get_or_insert_with(Default::default)
-            .extend(allow);
-        }
-        if let Some(deny) = permission.scope.deny.clone() {
-          resolved_scope
-            .deny
-            .get_or_insert_with(Default::default)
-            .extend(deny);
-        }
-
-        commands.allow.extend(permission.commands.allow.clone());
-        commands.deny.extend(permission.commands.deny.clone());
+      if let Some(deny) = scope.deny.clone() {
+        resolved_scope
+          .deny
+          .get_or_insert_with(Default::default)
+          .extend(deny);
       }
-
-      f(ResolvedPermission {
-        plugin_name,
-        permission_name,
-        commands,
-        scope: resolved_scope,
-      });
     }
+
+    for permission in permissions {
+      if let Some(allow) = permission.scope.allow.clone() {
+        resolved_scope
+          .allow
+          .get_or_insert_with(Default::default)
+          .extend(allow);
+      }
+      if let Some(deny) = permission.scope.deny.clone() {
+        resolved_scope
+          .deny
+          .get_or_insert_with(Default::default)
+          .extend(deny);
+      }
+
+      commands.allow.extend(permission.commands.allow.clone());
+      commands.deny.extend(permission.commands.deny.clone());
+    }
+
+    f(ResolvedPermission {
+      key,
+      permission_name,
+      commands,
+      scope: resolved_scope,
+    })?;
   }
 
   Ok(())
 }
 
-#[derive(Debug, Default)]
-struct ResolvedCommandTemp {
-  #[cfg(debug_assertions)]
-  pub referenced_by: Vec<ResolvedCommandReference>,
-  pub windows: HashSet<String>,
-  pub webviews: HashSet<String>,
-  pub scope: Vec<ScopeKey>,
-  pub resolved_scope_key: Option<ScopeKey>,
-}
-
 fn resolve_command(
-  commands: &mut BTreeMap<CommandKey, ResolvedCommandTemp>,
+  commands: &mut BTreeMap<String, Vec<ResolvedCommand>>,
   command: String,
   capability: &Capability,
   scope_id: Option<ScopeKey>,
   #[cfg(debug_assertions)] referenced_by_permission_identifier: String,
-) {
+) -> Result<(), Error> {
   let mut contexts = Vec::new();
   if capability.local {
     contexts.push(ExecutionContext::Local);
@@ -353,33 +300,30 @@ fn resolve_command(
   if let Some(remote) = &capability.remote {
     contexts.extend(remote.urls.iter().map(|url| {
       ExecutionContext::Remote {
-        url: Pattern::new(url)
-          .unwrap_or_else(|e| panic!("invalid glob pattern for remote URL {url}: {e}")),
+        url: url
+          .parse()
+          .unwrap_or_else(|e| panic!("invalid URL pattern for remote URL {url}: {e}")),
       }
     }));
   }
 
   for context in contexts {
-    let resolved = commands
-      .entry(CommandKey {
-        name: command.clone(),
-        context,
-      })
-      .or_default();
+    let resolved_list = commands.entry(command.clone()).or_default();
 
-    #[cfg(debug_assertions)]
-    resolved.referenced_by.push(ResolvedCommandReference {
-      capability: capability.identifier.clone(),
-      permission: referenced_by_permission_identifier.clone(),
+    resolved_list.push(ResolvedCommand {
+      context,
+      #[cfg(debug_assertions)]
+      referenced_by: ResolvedCommandReference {
+        capability: capability.identifier.clone(),
+        permission: referenced_by_permission_identifier.clone(),
+      },
+      windows: parse_glob_patterns(capability.windows.clone())?,
+      webviews: parse_glob_patterns(capability.webviews.clone())?,
+      scope_id,
     });
-
-    resolved.windows.extend(capability.windows.clone());
-    resolved.webviews.extend(capability.webviews.clone());
-
-    if let Some(id) = scope_id {
-      resolved.scope.push(id);
-    }
   }
+
+  Ok(())
 }
 
 // get the permissions from a permission set
@@ -406,12 +350,16 @@ fn get_permission_set_permissions<'a>(
 }
 
 fn get_permissions<'a>(
-  plugin_name: &'a str,
+  key: &'a str,
   permission_name: &'a str,
   acl: &'a BTreeMap<String, Manifest>,
 ) -> Result<Vec<&'a Permission>, Error> {
-  let manifest = acl.get(plugin_name).ok_or_else(|| Error::UnknownPlugin {
-    plugin: plugin_name.to_string(),
+  let manifest = acl.get(key).ok_or_else(|| Error::UnknownManifest {
+    key: if key == APP_ACL_KEY {
+      "app manifest".to_string()
+    } else {
+      key.to_string()
+    },
     available: acl.keys().cloned().collect::<Vec<_>>().join(", "),
   })?;
 
@@ -419,18 +367,19 @@ fn get_permissions<'a>(
     manifest
       .default_permission
       .as_ref()
-      .ok_or_else(|| Error::UnknownPermission {
-        plugin: plugin_name.to_string(),
-        permission: permission_name.to_string(),
-      })
-      .and_then(|default| get_permission_set_permissions(manifest, default))
+      .map(|default| get_permission_set_permissions(manifest, default))
+      .unwrap_or_else(|| Ok(Vec::new()))
   } else if let Some(set) = manifest.permission_sets.get(permission_name) {
     get_permission_set_permissions(manifest, set)
   } else if let Some(permission) = manifest.permissions.get(permission_name) {
     Ok(vec![permission])
   } else {
     Err(Error::UnknownPermission {
-      plugin: plugin_name.to_string(),
+      key: if key == APP_ACL_KEY {
+        "app manifest".to_string()
+      } else {
+        key.to_string()
+      },
       permission: permission_name.to_string(),
     })
   }
@@ -444,19 +393,6 @@ mod build {
 
   use super::*;
   use crate::{literal_struct, tokens::*};
-
-  impl ToTokens for CommandKey {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-      let name = str_lit(&self.name);
-      let context = &self.context;
-      literal_struct!(
-        tokens,
-        ::tauri::utils::acl::resolved::CommandKey,
-        name,
-        context
-      )
-    }
-  }
 
   #[cfg(debug_assertions)]
   impl ToTokens for ResolvedCommandReference {
@@ -475,7 +411,9 @@ mod build {
   impl ToTokens for ResolvedCommand {
     fn to_tokens(&self, tokens: &mut TokenStream) {
       #[cfg(debug_assertions)]
-      let referenced_by = vec_lit(&self.referenced_by, identity);
+      let referenced_by = &self.referenced_by;
+
+      let context = &self.context;
 
       let windows = vec_lit(&self.windows, |window| {
         let w = window.as_str();
@@ -485,26 +423,28 @@ mod build {
         let w = window.as_str();
         quote!(#w.parse().unwrap())
       });
-      let scope = opt_lit(self.scope.as_ref());
+      let scope_id = opt_lit(self.scope_id.as_ref());
 
       #[cfg(debug_assertions)]
       {
         literal_struct!(
           tokens,
           ::tauri::utils::acl::resolved::ResolvedCommand,
+          context,
           referenced_by,
           windows,
           webviews,
-          scope
+          scope_id
         )
       }
       #[cfg(not(debug_assertions))]
       literal_struct!(
         tokens,
         ::tauri::utils::acl::resolved::ResolvedCommand,
+        context,
         windows,
         webviews,
-        scope
+        scope_id
       )
     }
   }
@@ -527,15 +467,15 @@ mod build {
       let allowed_commands = map_lit(
         quote! { ::std::collections::BTreeMap },
         &self.allowed_commands,
-        identity,
-        identity,
+        str_lit,
+        |v| vec_lit(v, identity),
       );
 
       let denied_commands = map_lit(
         quote! { ::std::collections::BTreeMap },
         &self.denied_commands,
-        identity,
-        identity,
+        str_lit,
+        |v| vec_lit(v, identity),
       );
 
       let command_scope = map_lit(

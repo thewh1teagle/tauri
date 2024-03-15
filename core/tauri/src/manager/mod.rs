@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -13,7 +13,6 @@ use serde::Serialize;
 use url::Url;
 
 use tauri_macros::default_runtime;
-use tauri_utils::debug_eprintln;
 use tauri_utils::{
   assets::{AssetKey, CspHash},
   config::{Csp, CspDirectiveSources},
@@ -25,8 +24,8 @@ use crate::{
   event::{assert_event_name_is_valid, Event, EventId, EventTarget, Listeners},
   ipc::{Invoke, InvokeHandler, InvokeResponder, RuntimeAuthority},
   plugin::PluginStore,
-  utils::{assets::Assets, config::Config, PackageInfo},
-  Context, Pattern, Runtime, StateManager, Window,
+  utils::{config::Config, PackageInfo},
+  Assets, Context, Pattern, Runtime, StateManager, Window,
 };
 use crate::{event::EmitArgs, resources::ResourceTable, Webview};
 
@@ -47,16 +46,17 @@ struct CspHashStrings {
 /// Sets the CSP value to the asset HTML if needed (on Linux).
 /// Returns the CSP string for access on the response header (on Windows and macOS).
 #[allow(clippy::borrowed_box)]
-fn set_csp<R: Runtime>(
+pub(crate) fn set_csp<R: Runtime>(
   asset: &mut String,
-  assets: &Box<dyn Assets>,
+  assets: &impl std::borrow::Borrow<dyn Assets<R>>,
   asset_path: &AssetKey,
   manager: &AppManager<R>,
   csp: Csp,
-) -> String {
+) -> HashMap<String, CspDirectiveSources> {
   let mut csp = csp.into();
   let hash_strings =
     assets
+      .borrow()
       .csp_hashes(asset_path)
       .fold(CspHashStrings::default(), |mut acc, hash| {
         match hash {
@@ -67,7 +67,7 @@ fn set_csp<R: Runtime>(
             acc.style.push(hash.into());
           }
           _csp_hash => {
-            debug_eprintln!("Unknown CspHash variant encountered: {:?}", _csp_hash);
+            log::debug!("Unknown CspHash variant encountered: {:?}", _csp_hash);
           }
         }
 
@@ -99,15 +99,7 @@ fn set_csp<R: Runtime>(
     );
   }
 
-  #[cfg(feature = "isolation")]
-  if let Pattern::Isolation { schema, .. } = &*manager.pattern {
-    let default_src = csp
-      .entry("default-src".into())
-      .or_insert_with(Default::default);
-    default_src.push(crate::pattern::format_real_schema(schema));
-  }
-
-  Csp::DirectiveMap(csp).to_string()
+  csp
 }
 
 // inspired by https://github.com/rust-lang/rust/blob/1be5c8f90912c446ecbdc405cbc4a89f9acd20fd/library/alloc/src/str.rs#L260-L297
@@ -187,7 +179,7 @@ pub struct AppManager<R: Runtime> {
   pub listeners: Listeners,
   pub state: Arc<StateManager>,
   pub config: Config,
-  pub assets: Box<dyn Assets>,
+  pub assets: Box<dyn Assets<R>>,
 
   pub app_icon: Option<Vec<u8>>,
 
@@ -195,6 +187,9 @@ pub struct AppManager<R: Runtime> {
 
   /// Application pattern.
   pub pattern: Arc<Pattern>,
+
+  /// Global API scripts collected from plugins.
+  pub plugin_global_api_scripts: Arc<Option<&'static [&'static str]>>,
 
   /// Application Resources Table
   pub(crate) resources_table: Arc<Mutex<ResourceTable>>,
@@ -224,7 +219,7 @@ impl<R: Runtime> fmt::Debug for AppManager<R> {
 impl<R: Runtime> AppManager<R> {
   #[allow(clippy::too_many_arguments, clippy::type_complexity)]
   pub(crate) fn with_handlers(
-    #[allow(unused_mut)] mut context: Context<impl Assets>,
+    #[allow(unused_mut)] mut context: Context<R>,
     plugins: PluginStore<R>,
     invoke_handler: Box<InvokeHandler<R>>,
     on_page_load: Option<Arc<OnPageLoad<R>>>,
@@ -282,6 +277,7 @@ impl<R: Runtime> AppManager<R> {
       app_icon: context.app_icon,
       package_info: context.package_info,
       pattern: Arc::new(context.pattern),
+      plugin_global_api_scripts: Arc::new(context.plugin_global_api_scripts),
       resources_table: Arc::default(),
     }
   }
@@ -328,7 +324,7 @@ impl<R: Runtime> AppManager<R> {
   }
 
   fn csp(&self) -> Option<Csp> {
-    if cfg!(feature = "custom-protocol") {
+    if !crate::dev() {
       self.config.app.security.csp.clone()
     } else {
       self
@@ -362,14 +358,14 @@ impl<R: Runtime> AppManager<R> {
     let asset_response = assets
       .get(&path.as_str().into())
       .or_else(|| {
-        debug_eprintln!("Asset `{path}` not found; fallback to {path}.html");
+        log::debug!("Asset `{path}` not found; fallback to {path}.html");
         let fallback = format!("{}.html", path.as_str()).into();
         let asset = assets.get(&fallback);
         asset_path = fallback;
         asset
       })
       .or_else(|| {
-        debug_eprintln!(
+        log::debug!(
           "Asset `{}` not found; fallback to {}/index.html",
           path,
           path
@@ -380,7 +376,7 @@ impl<R: Runtime> AppManager<R> {
         asset
       })
       .or_else(|| {
-        debug_eprintln!("Asset `{}` not found; fallback to index.html", path);
+        log::debug!("Asset `{}` not found; fallback to index.html", path);
         let fallback = AssetKey::from("index.html");
         let asset = assets.get(&fallback);
         asset_path = fallback;
@@ -397,7 +393,17 @@ impl<R: Runtime> AppManager<R> {
         let final_data = if is_html {
           let mut asset = String::from_utf8_lossy(&asset).into_owned();
           if let Some(csp) = self.csp() {
-            csp_header.replace(set_csp(&mut asset, &self.assets, &asset_path, self, csp));
+            #[allow(unused_mut)]
+            let mut csp_map = set_csp(&mut asset, &self.assets, &asset_path, self, csp);
+            #[cfg(feature = "isolation")]
+            if let Pattern::Isolation { schema, .. } = &*self.pattern {
+              let default_src = csp_map
+                .entry("default-src".into())
+                .or_insert_with(Default::default);
+              default_src.push(crate::pattern::format_real_schema(schema));
+            }
+
+            csp_header.replace(Csp::DirectiveMap(csp_map).to_string());
           }
 
           asset.as_bytes().to_vec()
@@ -412,7 +418,7 @@ impl<R: Runtime> AppManager<R> {
         })
       }
       Err(e) => {
-        debug_eprintln!("{:?}", e); // TODO log::error!
+        log::error!("{:?}", e);
         Err(Box::new(e))
       }
     }

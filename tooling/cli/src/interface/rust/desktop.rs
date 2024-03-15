@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -61,10 +61,6 @@ impl DevProcess for DevChild {
 
   fn manually_killed_process(&self) -> bool {
     self.manually_killed_app.load(Ordering::Relaxed)
-  }
-
-  fn is_building_app(&self) -> bool {
-    self.app_child.lock().unwrap().is_none()
   }
 }
 

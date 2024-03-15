@@ -1,5 +1,52 @@
 # Changelog
 
+## \[2.0.0-beta.9]
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.9`
+- Upgraded to `tauri-runtime@2.0.0-beta.9`
+
+## \[2.0.0-beta.8]
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.8`
+- Upgraded to `tauri-runtime@2.0.0-beta.8`
+
+## \[2.0.0-beta.7]
+
+### New Features
+
+- [`46de49aaa`](https://www.github.com/tauri-apps/tauri/commit/46de49aaad4a148fafc31d591be0e2ed12256507)([#9059](https://www.github.com/tauri-apps/tauri/pull/9059)) Added `set_auto_resize` method for the webview.
+
+### Enhancements
+
+- [`46de49aaa`](https://www.github.com/tauri-apps/tauri/commit/46de49aaad4a148fafc31d591be0e2ed12256507)([#9059](https://www.github.com/tauri-apps/tauri/pull/9059)) When using the `unstable` feature flag, `WebviewWindow` will internally use the child webview interface for flexibility.
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.7`
+- Upgraded to `tauri-runtime@2.0.0-beta.7`
+
+## \[2.0.0-beta.6]
+
+### Bug Fixes
+
+- [`222a96b7`](https://www.github.com/tauri-apps/tauri/commit/222a96b74b145fb48d3f0c109897962d56fae57a)([#8999](https://www.github.com/tauri-apps/tauri/pull/8999)) Fixes auto resize and positioning when using the multiwebview mode.
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.6`
+- Upgraded to `tauri-runtime@2.0.0-beta.6`
+
+## \[2.0.0-beta.5]
+
+### Dependencies
+
+- Upgraded to `tauri-utils@2.0.0-beta.5`
+- Upgraded to `tauri-runtime@2.0.0-beta.5`
+
 ## \[2.0.0-beta.4]
 
 ### New Features

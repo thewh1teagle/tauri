@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -36,6 +36,7 @@ import {
 import { invoke } from './core'
 import { WebviewWindow } from './webviewWindow'
 import type { FileDropEvent, FileDropPayload } from './webview'
+import { Image, transformImage } from './image'
 
 /**
  * Allows you to retrieve information about a given monitor.
@@ -1383,20 +1384,22 @@ class Window {
    * await getCurrent().setIcon('/tauri/awesome.png');
    * ```
    *
-   * Note that you need the `icon-ico` or `icon-png` Cargo features to use this API.
+   * Note that you need the `image-ico` or `image-png` Cargo features to use this API.
    * To enable it, change your Cargo.toml file:
    * ```toml
    * [dependencies]
-   * tauri = { version = "...", features = ["...", "icon-png"] }
+   * tauri = { version = "...", features = ["...", "image-png"] }
    * ```
    *
    * @param icon Icon bytes or path to the icon file.
    * @returns A promise indicating the success or failure of the operation.
    */
-  async setIcon(icon: string | Uint8Array): Promise<void> {
+  async setIcon(
+    icon: string | Image | Uint8Array | ArrayBuffer | number[]
+  ): Promise<void> {
     return invoke('plugin:window|set_icon', {
       label: this.label,
-      value: typeof icon === 'string' ? icon : Array.from(icon)
+      value: transformImage(icon)
     })
   }
 

@@ -1,5 +1,5 @@
 // Copyright 2016-2019 Cargo-Bundle developers <https://github.com/burtonageo/cargo-bundle>
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -28,7 +28,6 @@ use crate::Settings;
 use anyhow::Context;
 use flate2::{write::GzEncoder, Compression};
 use heck::AsKebabCase;
-use log::info;
 use tar::HeaderMode;
 use walkdir::WalkDir;
 
@@ -66,7 +65,7 @@ pub fn bundle_project(settings: &Settings) -> crate::Result<Vec<PathBuf>> {
   }
   let package_path = base_dir.join(&package_name);
 
-  info!(action = "Bundling"; "{} ({})", package_name, package_path.display());
+  log::info!(action = "Bundling"; "{} ({})", package_name, package_path.display());
 
   let (data_dir, _) = generate_data(settings, &package_dir)
     .with_context(|| "Failed to build data folders and files")?;

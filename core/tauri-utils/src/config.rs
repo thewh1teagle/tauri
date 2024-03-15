@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -119,6 +119,22 @@ pub enum BundleType {
   Dmg,
   /// The Tauri updater bundle.
   Updater,
+}
+
+impl BundleType {
+  /// All bundle types.
+  fn all() -> &'static [Self] {
+    &[
+      BundleType::Deb,
+      BundleType::Rpm,
+      BundleType::AppImage,
+      BundleType::Msi,
+      BundleType::Nsis,
+      BundleType::App,
+      BundleType::Dmg,
+      BundleType::Updater,
+    ]
+  }
 }
 
 impl Display for BundleType {
@@ -274,7 +290,7 @@ impl BundleTarget {
   #[allow(dead_code)]
   pub fn to_vec(&self) -> Vec<BundleType> {
     match self {
-      Self::All => vec![],
+      Self::All => BundleType::all().to_vec(),
       Self::List(list) => list.clone(),
       Self::One(i) => vec![i.clone()],
     }
@@ -1430,23 +1446,6 @@ impl Default for DisabledCspModificationKind {
   }
 }
 
-/// External command access definition.
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
-#[cfg_attr(feature = "schema", derive(JsonSchema))]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RemoteDomainAccessScope {
-  /// The URL scheme to allow. By default, all schemas are allowed.
-  pub scheme: Option<String>,
-  /// The domain to allow.
-  pub domain: String,
-  /// The list of window labels this scope applies to.
-  pub windows: Vec<String>,
-  /// The list of plugins that are allowed in this scope.
-  /// The names should be without the `tauri-plugin-` prefix, for example `"store"` for `tauri-plugin-store`.
-  #[serde(default)]
-  pub plugins: Vec<String>,
-}
-
 /// Protocol scope definition.
 /// It is a list of glob patterns that restrict the API access from the webview.
 ///
@@ -2080,7 +2079,7 @@ mod build {
   impl ToTokens for Color {
     fn to_tokens(&self, tokens: &mut TokenStream) {
       let Color(r, g, b, a) = self;
-      tokens.append_all(quote! {::tauri::utils::Color(#r,#g,#b,#a)});
+      tokens.append_all(quote! {::tauri::utils::config::Color(#r,#g,#b,#a)});
     }
   }
   impl ToTokens for WindowEffectsConfig {
@@ -2453,24 +2452,6 @@ mod build {
           quote! { #prefix::List(#directives) }
         }
       });
-    }
-  }
-
-  impl ToTokens for RemoteDomainAccessScope {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-      let scheme = opt_str_lit(self.scheme.as_ref());
-      let domain = str_lit(&self.domain);
-      let windows = vec_lit(&self.windows, str_lit);
-      let plugins = vec_lit(&self.plugins, str_lit);
-
-      literal_struct!(
-        tokens,
-        ::tauri::utils::config::RemoteDomainAccessScope,
-        scheme,
-        domain,
-        windows,
-        plugins
-      );
     }
   }
 

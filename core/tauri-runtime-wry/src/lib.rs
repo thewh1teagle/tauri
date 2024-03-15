@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -59,7 +59,7 @@ use tao::{
 };
 #[cfg(target_os = "macos")]
 use tauri_utils::TitleBarStyle;
-use tauri_utils::{config::WindowConfig, debug_eprintln, Theme};
+use tauri_utils::{config::WindowConfig, Theme};
 use url::Url;
 use wry::{
   FileDropEvent as WryFileDropEvent, ProxyConfig, ProxyEndpoint, WebContext, WebView,
@@ -418,16 +418,12 @@ impl From<DeviceEventFilter> for DeviceEventFilterWrapper {
 /// Wrapper around a [`tao::window::Icon`] that can be created from an [`Icon`].
 pub struct TaoIcon(pub TaoWindowIcon);
 
-fn icon_err<E: std::error::Error + Send + Sync + 'static>(e: E) -> Error {
-  Error::InvalidIcon(Box::new(e))
-}
-
-impl TryFrom<Icon> for TaoIcon {
+impl TryFrom<Icon<'_>> for TaoIcon {
   type Error = Error;
-  fn try_from(icon: Icon) -> std::result::Result<Self, Self::Error> {
-    TaoWindowIcon::from_rgba(icon.rgba, icon.width, icon.height)
+  fn try_from(icon: Icon<'_>) -> std::result::Result<Self, Self::Error> {
+    TaoWindowIcon::from_rgba(icon.rgba.to_vec(), icon.width, icon.height)
       .map(Self)
-      .map_err(icon_err)
+      .map_err(|e| Error::InvalidIcon(Box::new(e)))
   }
 }
 
@@ -1178,6 +1174,7 @@ pub enum WebviewMessage {
   SetSize(Size),
   SetFocus,
   Reparent(WindowId),
+  SetAutoResize(bool),
   // Getters
   Url(Sender<Url>),
   Position(Sender<PhysicalPosition<i32>>),
@@ -1386,6 +1383,17 @@ impl<T: UserEvent> WebviewDispatch<T> for WryWebviewDispatcher<T> {
 
     *current_window_id = window_id;
     Ok(())
+  }
+
+  fn set_auto_resize(&self, auto_resize: bool) -> Result<()> {
+    send_user_message(
+      &self.context,
+      Message::Webview(
+        *self.window_id.lock().unwrap(),
+        self.webview_id,
+        WebviewMessage::SetAutoResize(auto_resize),
+      ),
+    )
   }
 
   #[cfg(all(feature = "tracing", not(target_os = "android")))]
@@ -1887,7 +1895,7 @@ pub struct WebviewWrapper {
   webview_event_listeners: WebviewEventListeners,
   // the key of the WebContext if it's not shared
   context_key: Option<PathBuf>,
-  bounds: Option<Arc<Mutex<WebviewBounds>>>,
+  bounds: Arc<Mutex<Option<WebviewBounds>>>,
 }
 
 impl Deref for WebviewWrapper {
@@ -2800,14 +2808,14 @@ fn handle_user_message<T: UserEvent>(
           WebviewMessage::EvaluateScript(script, tx, span) => {
             let _span = span.entered();
             if let Err(e) = webview.evaluate_script(&script) {
-              debug_eprintln!("{}", e);
+              log::error!("{}", e);
             }
             tx.send(()).unwrap();
           }
           #[cfg(not(all(feature = "tracing", not(target_os = "android"))))]
           WebviewMessage::EvaluateScript(script) => {
             if let Err(e) = webview.evaluate_script(&script) {
-              debug_eprintln!("{}", e);
+              log::error!("{}", e);
             }
           }
           WebviewMessage::Navigate(url) => webview.load_url(url.as_str()),
@@ -2828,11 +2836,10 @@ fn handle_user_message<T: UserEvent>(
             bounds.width = size.width;
             bounds.height = size.height;
 
-            if let Some(b) = &webview.bounds {
-              let window_size = window.inner_size();
-              let mut bounds = b.lock().unwrap();
-              bounds.width_rate = size.width as f32 / window_size.width as f32;
-              bounds.height_rate = size.height as f32 / window_size.height as f32;
+            if let Some(b) = &mut *webview.bounds.lock().unwrap() {
+              let window_size = window.inner_size().to_logical::<f32>(window.scale_factor());
+              b.width_rate = size.width as f32 / window_size.width;
+              b.height_rate = size.height as f32 / window_size.height;
             }
 
             webview.set_bounds(bounds);
@@ -2843,11 +2850,10 @@ fn handle_user_message<T: UserEvent>(
             bounds.x = position.x;
             bounds.y = position.y;
 
-            if let Some(b) = &webview.bounds {
-              let window_size = window.inner_size();
-              let mut bounds = b.lock().unwrap();
-              bounds.width_rate = position.x as f32 / window_size.width as f32;
-              bounds.height_rate = position.y as f32 / window_size.height as f32;
+            if let Some(b) = &mut *webview.bounds.lock().unwrap() {
+              let window_size = window.inner_size().to_logical::<f32>(window.scale_factor());
+              b.x_rate = position.x as f32 / window_size.width;
+              b.y_rate = position.y as f32 / window_size.height;
             }
 
             webview.set_bounds(bounds);
@@ -2870,6 +2876,20 @@ fn handle_user_message<T: UserEvent>(
           }
           WebviewMessage::SetFocus => {
             webview.focus();
+          }
+          WebviewMessage::SetAutoResize(auto_resize) => {
+            let bounds = webview.bounds();
+            let window_size = window.inner_size().to_logical::<f32>(window.scale_factor());
+            *webview.bounds.lock().unwrap() = if auto_resize {
+              Some(WebviewBounds {
+                x_rate: (bounds.x as f32) / window_size.width,
+                y_rate: (bounds.y as f32) / window_size.height,
+                width_rate: (bounds.width as f32) / window_size.width,
+                height_rate: (bounds.height as f32) / window_size.height,
+              })
+            } else {
+              None
+            };
           }
           WebviewMessage::WithWebview(f) => {
             #[cfg(any(
@@ -2913,7 +2933,6 @@ fn handle_user_message<T: UserEvent>(
               f(webview.handle())
             }
           }
-
           #[cfg(any(debug_assertions, feature = "devtools"))]
           WebviewMessage::OpenDevTools => {
             webview.open_devtools();
@@ -2940,11 +2959,12 @@ fn handle_user_message<T: UserEvent>(
           Ok(webview) => {
             windows.0.borrow_mut().get_mut(&window_id).map(|w| {
               w.webviews.push(webview);
+              w.has_children.store(true, Ordering::Relaxed);
               w
             });
           }
           Err(e) => {
-            debug_eprintln!("{}", e);
+            log::error!("{}", e);
           }
         }
       }
@@ -2954,7 +2974,7 @@ fn handle_user_message<T: UserEvent>(
         windows.0.borrow_mut().insert(window_id, webview);
       }
       Err(e) => {
-        debug_eprintln!("{}", e);
+        log::error!("{}", e);
       }
     },
     Message::CreateRawWindow(window_id, handler, sender) => {
@@ -3181,20 +3201,20 @@ fn handle_event_loop<T: UserEvent>(
             }
           }
           TaoWindowEvent::Resized(size) => {
-            if let Some(webviews) = windows
+            if let Some((Some(window), webviews)) = windows
               .0
               .borrow()
               .get(&window_id)
-              .map(|w| w.webviews.clone())
+              .map(|w| (w.inner.clone(), w.webviews.clone()))
             {
+              let size = size.to_logical::<f32>(window.scale_factor());
               for webview in webviews {
-                if let Some(bounds) = &webview.bounds {
-                  let b = bounds.lock().unwrap();
+                if let Some(b) = &*webview.bounds.lock().unwrap() {
                   webview.set_bounds(wry::Rect {
-                    x: (size.width as f32 * b.x_rate) as i32,
-                    y: (size.height as f32 * b.y_rate) as i32,
-                    width: (size.width as f32 * b.width_rate) as u32,
-                    height: (size.height as f32 * b.height_rate) as u32,
+                    x: (size.width * b.x_rate) as i32,
+                    y: (size.height * b.y_rate) as i32,
+                    width: (size.width * b.width_rate) as u32,
+                    height: (size.height * b.height_rate) as u32,
                   });
                 }
               }
@@ -3429,6 +3449,9 @@ fn create_window<T: UserEvent, F: Fn(RawWindow) + Send + 'static>(
 
   if let Some(webview) = webview {
     webviews.push(create_webview(
+      #[cfg(feature = "unstable")]
+      WebviewKind::WindowChild,
+      #[cfg(not(feature = "unstable"))]
       WebviewKind::WindowContent,
       &window,
       Arc::new(Mutex::new(window_id)),
@@ -3594,7 +3617,8 @@ fn create_webview<T: UserEvent>(
 
   if let Some(navigation_handler) = pending.navigation_handler {
     webview_builder = webview_builder.with_navigation_handler(move |url| {
-      Url::parse(&url)
+      url
+        .parse()
         .map(|url| navigation_handler(&url))
         .unwrap_or(true)
     });
@@ -3610,19 +3634,37 @@ fn create_webview<T: UserEvent>(
       height: size.height,
     });
 
-    let window_size = window.inner_size();
+    let window_size = window.inner_size().to_logical::<f32>(window.scale_factor());
 
     if webview_attributes.auto_resize {
       Some(WebviewBounds {
-        x_rate: (position.x as f32) / window_size.width as f32,
-        y_rate: (position.y as f32) / window_size.height as f32,
-        width_rate: (size.width as f32) / window_size.width as f32,
-        height_rate: (size.height as f32) / window_size.height as f32,
+        x_rate: (position.x as f32) / window_size.width,
+        y_rate: (position.y as f32) / window_size.height,
+        width_rate: (size.width as f32) / window_size.width,
+        height_rate: (size.height as f32) / window_size.height,
       })
     } else {
       None
     }
   } else {
+    #[cfg(feature = "unstable")]
+    {
+      let window_size = window.inner_size().to_logical::<u32>(window.scale_factor());
+
+      webview_builder = webview_builder.with_bounds(wry::Rect {
+        x: 0,
+        y: 0,
+        width: window_size.width,
+        height: window_size.height,
+      });
+      Some(WebviewBounds {
+        x_rate: 0.,
+        y_rate: 0.,
+        width_rate: 1.,
+        height_rate: 1.,
+      })
+    }
+    #[cfg(not(feature = "unstable"))]
     None
   };
 
@@ -3647,7 +3689,7 @@ fn create_webview<T: UserEvent>(
 
   if let Some(page_load_handler) = pending.on_page_load_handler {
     webview_builder = webview_builder.with_on_page_load_handler(move |event, url| {
-      let _ = Url::parse(&url).map(|url| {
+      let _ = url.parse().map(|url| {
         page_load_handler(
           url,
           match event {
@@ -3830,7 +3872,7 @@ fn create_webview<T: UserEvent>(
     } else {
       web_context_key
     },
-    bounds: webview_bounds.map(|b| Arc::new(Mutex::new(b))),
+    bounds: Arc::new(Mutex::new(webview_bounds)),
   })
 }
 

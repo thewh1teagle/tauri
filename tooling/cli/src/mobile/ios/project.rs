@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -17,7 +17,7 @@ use cargo_mobile2::{
 use handlebars::Handlebars;
 use include_dir::{include_dir, Dir};
 use std::{
-  ffi::{OsStr, OsString},
+  ffi::OsString,
   fs::{create_dir_all, OpenOptions},
   path::{Component, PathBuf},
 };
@@ -155,7 +155,7 @@ pub fn gen(
       let mut options = OpenOptions::new();
       options.write(true);
 
-      if path.file_name().unwrap() == OsStr::new("BuildTask.kt") || !path.exists() {
+      if !path.exists() {
         options.create(true).open(path).map(Some)
       } else {
         Ok(None)

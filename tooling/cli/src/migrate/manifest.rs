@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -15,7 +15,7 @@ const CRATE_TYPES: [&str; 3] = ["lib", "staticlib", "cdylib"];
 
 pub fn migrate(tauri_dir: &Path) -> Result<()> {
   let manifest_path = tauri_dir.join("Cargo.toml");
-  let mut manifest = read_manifest(&manifest_path)?;
+  let (mut manifest, _) = read_manifest(&manifest_path)?;
   migrate_manifest(&mut manifest)?;
 
   let mut manifest_file =

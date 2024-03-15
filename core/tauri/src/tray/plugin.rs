@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -8,12 +8,13 @@ use serde::Deserialize;
 
 use crate::{
   command,
+  image::JsImage,
   ipc::Channel,
   menu::{plugin::ItemKind, Menu, Submenu},
   plugin::{Builder, TauriPlugin},
   resources::ResourceId,
   tray::TrayIconBuilder,
-  AppHandle, IconDto, Manager, Runtime,
+  AppHandle, Manager, Runtime,
 };
 
 use super::TrayIcon;
@@ -23,7 +24,7 @@ use super::TrayIcon;
 struct TrayIconOptions {
   id: Option<String>,
   menu: Option<(ResourceId, ItemKind)>,
-  icon: Option<IconDto>,
+  icon: Option<JsImage>,
   tooltip: Option<String>,
   title: Option<String>,
   temp_dir_path: Option<PathBuf>,
@@ -63,7 +64,7 @@ fn new<R: Runtime>(
     };
   }
   if let Some(icon) = options.icon {
-    builder = builder.icon(icon.into());
+    builder = builder.icon(icon.into_img(&app)?.as_ref().clone());
   }
   if let Some(tooltip) = options.tooltip {
     builder = builder.tooltip(tooltip);
@@ -89,14 +90,37 @@ fn new<R: Runtime>(
 }
 
 #[command(root = "crate")]
+fn get_by_id<R: Runtime>(app: AppHandle<R>, id: &str) -> crate::Result<Option<ResourceId>> {
+  let tray = app.tray_by_id(id);
+  let maybe_rid = tray.map(|tray| {
+    let mut resources_table = app.resources_table();
+    resources_table.add(tray)
+  });
+  Ok(maybe_rid)
+}
+
+#[command(root = "crate")]
+fn remove_by_id<R: Runtime>(app: AppHandle<R>, id: &str) -> crate::Result<()> {
+  app
+    .remove_tray_by_id(id)
+    .ok_or_else(|| anyhow::anyhow!("Can't find a tray associated with this id: {id}"))
+    .map(|_| ())
+    .map_err(Into::into)
+}
+
+#[command(root = "crate")]
 fn set_icon<R: Runtime>(
   app: AppHandle<R>,
   rid: ResourceId,
-  icon: Option<IconDto>,
+  icon: Option<JsImage>,
 ) -> crate::Result<()> {
   let resources_table = app.resources_table();
   let tray = resources_table.get::<TrayIcon<R>>(rid)?;
-  tray.set_icon(icon.map(Into::into))
+  let icon = match icon {
+    Some(i) => Some(i.into_img(&app)?.as_ref().clone()),
+    None => None,
+  };
+  tray.set_icon(icon)
 }
 
 #[command(root = "crate")]
@@ -191,6 +215,8 @@ pub(crate) fn init<R: Runtime>() -> TauriPlugin<R> {
   Builder::new("tray")
     .invoke_handler(crate::generate_handler![
       new,
+      get_by_id,
+      remove_by_id,
       set_icon,
       set_menu,
       set_tooltip,

@@ -1,9 +1,9 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
 use serde::{Deserialize, Serialize};
-use tauri::command;
+use tauri::{command, ipc::CommandScope};
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
@@ -12,9 +12,25 @@ pub struct RequestBody {
   name: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct LogScope {
+  event: String,
+}
+
 #[command]
-pub fn log_operation(event: String, payload: Option<String>) {
-  log::info!("{} {:?}", event, payload);
+pub fn log_operation(
+  event: String,
+  payload: Option<String>,
+  command_scope: CommandScope<LogScope>,
+) -> Result<(), &'static str> {
+  if command_scope.denies().iter().any(|s| s.event == event) {
+    Err("denied")
+  } else if !command_scope.allows().iter().any(|s| s.event == event) {
+    Err("not allowed")
+  } else {
+    log::info!("{} {:?}", event, payload);
+    Ok(())
+  }
 }
 
 #[derive(Serialize)]

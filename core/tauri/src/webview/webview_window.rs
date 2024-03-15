@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -13,6 +13,7 @@ use crate::{
 };
 #[cfg(desktop)]
 use crate::{
+  image::Image,
   menu::{ContextMenu, Menu},
   runtime::{
     window::{
@@ -21,7 +22,6 @@ use crate::{
     },
     UserAttentionType,
   },
-  Icon,
 };
 use tauri_utils::config::{WebviewUrl, WindowConfig};
 use url::Url;
@@ -529,7 +529,7 @@ impl<'a, R: Runtime, M: Manager<R>> WebviewWindowBuilder<'a, R, M> {
   }
 
   /// Sets the window icon.
-  pub fn icon(mut self, icon: crate::Icon) -> crate::Result<Self> {
+  pub fn icon(mut self, icon: Image<'a>) -> crate::Result<Self> {
     self.window_builder = self.window_builder.icon(icon)?;
     Ok(self)
   }
@@ -880,7 +880,7 @@ impl<'de, R: Runtime> CommandArg<'de, R> for WebviewWindow<R> {
   /// Grabs the [`Window`] from the [`CommandItem`]. This will never fail.
   fn from_command(command: CommandItem<'de, R>) -> Result<Self, InvokeError> {
     let webview = command.message.webview();
-    if webview.window().is_webview_window {
+    if webview.window().is_webview_window() {
       Ok(Self { webview })
     } else {
       Err(InvokeError::from_anyhow(anyhow::anyhow!(
@@ -1243,7 +1243,7 @@ impl<R: Runtime> WebviewWindow<R> {
     self.webview.window().set_maximizable(maximizable)
   }
 
-  /// Determines if this window's native minize button should be enabled.
+  /// Determines if this window's native minimize button should be enabled.
   ///
   /// ## Platform-specific
   ///
@@ -1420,7 +1420,7 @@ impl<R: Runtime> WebviewWindow<R> {
   }
 
   /// Sets this window' icon.
-  pub fn set_icon(&self, icon: Icon) -> crate::Result<()> {
+  pub fn set_icon(&self, icon: Image<'_>) -> crate::Result<()> {
     self.webview.window().set_icon(icon)
   }
 

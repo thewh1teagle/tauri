@@ -1,8 +1,9 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
 use crate::{
+  image::Image,
   ipc::{
     channel::ChannelDataIpcQueue, CallbackFn, CommandArg, CommandItem, Invoke, InvokeError,
     InvokeHandler, InvokeResponder, InvokeResponse,
@@ -18,10 +19,10 @@ use crate::{
   },
   sealed::{ManagerBase, RuntimeOrDispatch},
   utils::config::Config,
-  utils::{assets::Assets, Env},
+  utils::Env,
   webview::PageLoadPayload,
-  Context, DeviceEventFilter, EventLoopMessage, Icon, Manager, Monitor, Runtime, Scopes,
-  StateManager, Theme, Webview, WebviewWindowBuilder, Window,
+  Context, DeviceEventFilter, EventLoopMessage, Manager, Monitor, Runtime, Scopes, StateManager,
+  Theme, Webview, WebviewWindowBuilder, Window,
 };
 
 #[cfg(desktop)]
@@ -40,7 +41,7 @@ use tauri_runtime::{
   },
   RuntimeInitArgs,
 };
-use tauri_utils::{debug_eprintln, PackageInfo};
+use tauri_utils::PackageInfo;
 
 use std::{
   borrow::Cow,
@@ -195,7 +196,7 @@ pub enum RunEvent {
   ExitRequested {
     /// Exit code.
     /// [`Option::None`] when the exit is requested by user interaction,
-    /// [`Option::Some`] when requested programatically via [`AppHandle#method.exit`] and [`AppHandle#method.restart`].
+    /// [`Option::Some`] when requested programmatically via [`AppHandle#method.exit`] and [`AppHandle#method.restart`].
     code: Option<i32>,
     /// Event API
     api: ExitRequestApi,
@@ -265,7 +266,7 @@ impl<R: Runtime> AssetResolver<R> {
   }
 
   /// Iterate on all assets.
-  pub fn iter(&self) -> Box<dyn Iterator<Item = (&&str, &&[u8])> + '_> {
+  pub fn iter(&self) -> Box<dyn Iterator<Item = (&str, &[u8])> + '_> {
     self.manager.assets.iter()
   }
 }
@@ -402,7 +403,7 @@ impl<R: Runtime> AppHandle<R> {
   /// Exits the app by triggering [`RunEvent::ExitRequested`] and [`RunEvent::Exit`].
   pub fn exit(&self, exit_code: i32) {
     if let Err(e) = self.runtime_handle.request_exit(exit_code) {
-      debug_eprintln!("failed to exit: {}", e);
+      log::error!("failed to exit: {}", e);
       self.cleanup_before_exit();
       std::process::exit(exit_code);
     }
@@ -508,13 +509,7 @@ macro_rules! shared_app_impl {
         &self,
         handler: F,
       ) {
-        self
-          .manager
-          .menu
-          .global_event_listeners
-          .lock()
-          .unwrap()
-          .push(Box::new(handler));
+        self.manager.menu.on_menu_event(handler)
       }
 
       /// Registers a global tray icon menu event listener.
@@ -524,35 +519,7 @@ macro_rules! shared_app_impl {
         &self,
         handler: F,
       ) {
-        self
-          .manager
-          .tray
-          .global_event_listeners
-          .lock()
-          .unwrap()
-          .push(Box::new(handler));
-      }
-
-      /// Gets the first tray icon registered,
-      /// usually the one configured in the Tauri configuration file.
-      #[cfg(all(desktop, feature = "tray-icon"))]
-      #[cfg_attr(docsrs, doc(cfg(all(desktop, feature = "tray-icon"))))]
-      pub fn tray(&self) -> Option<TrayIcon<R>> {
-        self.manager.tray.icons.lock().unwrap().first().cloned()
-      }
-
-      /// Removes the first tray icon registerd, usually the one configured in
-      /// tauri config file, from tauri's internal state and returns it.
-      ///
-      /// Note that dropping the returned icon, will cause the tray icon to disappear.
-      #[cfg(all(desktop, feature = "tray-icon"))]
-      #[cfg_attr(docsrs, doc(cfg(all(desktop, feature = "tray-icon"))))]
-      pub fn remove_tray(&self) -> Option<TrayIcon<R>> {
-        let mut icons = self.manager.tray.icons.lock().unwrap();
-        if !icons.is_empty() {
-          return Some(icons.swap_remove(0));
-        }
-        None
+        self.manager.tray.on_tray_icon_event(handler)
       }
 
       /// Gets a tray icon using the provided id.
@@ -563,20 +530,13 @@ macro_rules! shared_app_impl {
         I: ?Sized,
         TrayIconId: PartialEq<&'a I>,
       {
-        self
-          .manager
-          .tray
-          .icons
-          .lock()
-          .unwrap()
-          .iter()
-          .find(|t| t.id() == &id)
-          .cloned()
+        self.manager.tray.tray_by_id(id)
       }
 
       /// Removes a tray icon using the provided id from tauri's internal state and returns it.
       ///
-      /// Note that dropping the returned icon, will cause the tray icon to disappear.
+      /// Note that dropping the returned icon, may cause the tray icon to disappear
+      /// if it wasn't cloned somewhere else or referenced by JS.
       #[cfg(all(desktop, feature = "tray-icon"))]
       #[cfg_attr(docsrs, doc(cfg(all(desktop, feature = "tray-icon"))))]
       pub fn remove_tray_by_id<'a, I>(&self, id: &'a I) -> Option<TrayIcon<R>>
@@ -584,12 +544,7 @@ macro_rules! shared_app_impl {
         I: ?Sized,
         TrayIconId: PartialEq<&'a I>,
       {
-        let mut icons = self.manager.tray.icons.lock().unwrap();
-        let idx = icons.iter().position(|t| t.id() == &id);
-        if let Some(idx) = idx {
-          return Some(icons.swap_remove(idx));
-        }
-        None
+        self.manager.tray.remove_tray_by_id(id)
       }
 
       /// Gets the app's configuration, defined on the `tauri.conf.json` file.
@@ -633,7 +588,7 @@ macro_rules! shared_app_impl {
         })
       }
       /// Returns the default window icon.
-      pub fn default_window_icon(&self) -> Option<&Icon> {
+      pub fn default_window_icon(&self) -> Option<&Image<'_>> {
         self.manager.window.default_icon.as_ref()
       }
 
@@ -870,6 +825,7 @@ impl<R: Runtime> App<R> {
     self.handle.plugin(crate::webview::plugin::init())?;
     self.handle.plugin(crate::app::plugin::init())?;
     self.handle.plugin(crate::resources::plugin::init())?;
+    self.handle.plugin(crate::image::plugin::init())?;
     #[cfg(desktop)]
     self.handle.plugin(crate::menu::plugin::init())?;
     #[cfg(all(desktop, feature = "tray-icon"))]
@@ -1084,8 +1040,7 @@ struct InvokeInitializationScript<'a> {
   process_ipc_message_fn: &'a str,
   os_name: &'a str,
   fetch_channel_data_command: &'a str,
-  use_custom_protocol: bool,
-  force_v1_protocol: bool
+  linux_ipc_protocol_enabled: bool,
 }
 
 /// Make `Wry` the default `Runtime` for `Builder`
@@ -1118,8 +1073,7 @@ impl<R: Runtime> Builder<R> {
         process_ipc_message_fn: crate::manager::webview::PROCESS_IPC_MESSAGE_FN,
         os_name: std::env::consts::OS,
         fetch_channel_data_command: crate::ipc::channel::FETCH_CHANNEL_DATA_COMMAND,
-        use_custom_protocol: cfg!(ipc_custom_protocol),
-        force_v1_protocol: cfg!(feature = "force-ipc-v1-protocol")
+        linux_ipc_protocol_enabled: cfg!(feature = "linux-ipc-protocol"),
       }
       .render_default(&Default::default())
       .unwrap()
@@ -1581,7 +1535,7 @@ tauri::Builder::default()
     feature = "tracing",
     tracing::instrument(name = "app::build", skip_all)
   )]
-  pub fn build<A: Assets>(mut self, context: Context<A>) -> crate::Result<App<R>> {
+  pub fn build(mut self, context: Context<R>) -> crate::Result<App<R>> {
     #[cfg(target_os = "macos")]
     if self.menu.is_none() && self.enable_macos_default_menu {
       self.menu = Some(Box::new(|app_handle| {
@@ -1749,7 +1703,7 @@ tauri::Builder::default()
   }
 
   /// Runs the configured Tauri application.
-  pub fn run<A: Assets>(self, context: Context<A>) -> crate::Result<()> {
+  pub fn run(self, context: Context<R>) -> crate::Result<()> {
     self.build(context)?.run(|_, _| {});
     Ok(())
   }
@@ -1823,6 +1777,8 @@ fn setup<R: Runtime>(app: &mut App<R>) -> crate::Result<()> {
     WebviewWindowBuilder::from_config(app.handle(), &window_config)?
       .build_internal(&window_labels, &webview_labels)?;
   }
+
+  app.manager.assets.setup(app);
 
   if let Some(setup) = app.setup.take() {
     (setup)(app).map_err(|e| crate::Error::Setup(e.into()))?;

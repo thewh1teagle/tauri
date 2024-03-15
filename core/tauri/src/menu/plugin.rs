@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -13,11 +13,12 @@ use tauri_runtime::window::dpi::Position;
 use super::{sealed::ContextMenuBase, *};
 use crate::{
   command,
+  image::JsImage,
   ipc::{channel::JavaScriptChannelId, Channel},
   plugin::{Builder, TauriPlugin},
   resources::{ResourceId, ResourceTable},
   sealed::ManagerBase,
-  AppHandle, IconDto, Manager, RunEvent, Runtime, State, Webview, Window,
+  AppHandle, Manager, RunEvent, Runtime, State, Webview, Window,
 };
 use tauri_macros::do_menu_item;
 
@@ -44,24 +45,32 @@ pub(crate) struct AboutMetadata {
   pub website: Option<String>,
   pub website_label: Option<String>,
   pub credits: Option<String>,
-  pub icon: Option<IconDto>,
+  pub icon: Option<JsImage>,
 }
 
-impl From<AboutMetadata> for super::AboutMetadata {
-  fn from(value: AboutMetadata) -> Self {
-    Self {
-      name: value.name,
-      version: value.version,
-      short_version: value.short_version,
-      authors: value.authors,
-      comments: value.comments,
-      copyright: value.copyright,
-      license: value.license,
-      website: value.website,
-      website_label: value.website_label,
-      credits: value.credits,
-      icon: value.icon.map(Into::into),
-    }
+impl AboutMetadata {
+  pub fn into_metdata<R: Runtime, M: Manager<R>>(
+    self,
+    app: &M,
+  ) -> crate::Result<super::AboutMetadata<'_>> {
+    let icon = match self.icon {
+      Some(i) => Some(i.into_img(app)?.as_ref().clone()),
+      None => None,
+    };
+
+    Ok(super::AboutMetadata {
+      name: self.name,
+      version: self.version,
+      short_version: self.short_version,
+      authors: self.authors,
+      comments: self.comments,
+      copyright: self.copyright,
+      license: self.license,
+      website: self.website,
+      website_label: self.website_label,
+      credits: self.credits,
+      icon,
+    })
   }
 }
 
@@ -161,7 +170,7 @@ impl CheckMenuItemPayload {
 #[serde(untagged)]
 enum Icon {
   Native(NativeIcon),
-  Icon(IconDto),
+  Icon(JsImage),
 }
 
 #[derive(Deserialize)]
@@ -190,7 +199,7 @@ impl IconMenuItemPayload {
     }
     builder = match self.icon {
       Icon::Native(native_icon) => builder.native_icon(native_icon),
-      Icon::Icon(icon) => builder.icon(icon.into()),
+      Icon::Icon(icon) => builder.icon(icon.into_img(webview)?.as_ref().clone()),
     };
 
     let item = builder.build(webview)?;
@@ -276,7 +285,11 @@ impl PredefinedMenuItemPayload {
       Predefined::CloseWindow => PredefinedMenuItem::close_window(webview, self.text.as_deref()),
       Predefined::Quit => PredefinedMenuItem::quit(webview, self.text.as_deref()),
       Predefined::About(metadata) => {
-        PredefinedMenuItem::about(webview, self.text.as_deref(), metadata.map(Into::into))
+        let metadata = match metadata {
+          Some(m) => Some(m.into_metdata(webview)?),
+          None => None,
+        };
+        PredefinedMenuItem::about(webview, self.text.as_deref(), metadata)
       }
       Predefined::Services => PredefinedMenuItem::services(webview, self.text.as_deref()),
     }
@@ -826,9 +839,10 @@ fn set_icon<R: Runtime>(
 ) -> crate::Result<()> {
   let resources_table = app.resources_table();
   let icon_item = resources_table.get::<IconMenuItem<R>>(rid)?;
+
   match icon {
     Some(Icon::Native(icon)) => icon_item.set_native_icon(Some(icon)),
-    Some(Icon::Icon(icon)) => icon_item.set_icon(Some(icon.into())),
+    Some(Icon::Icon(icon)) => icon_item.set_icon(Some(icon.into_img(&app)?.as_ref().clone())),
     None => {
       icon_item.set_icon(None)?;
       icon_item.set_native_icon(None)?;

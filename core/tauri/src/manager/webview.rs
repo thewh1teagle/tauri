@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -208,6 +208,12 @@ impl<R: Runtime> WebviewManager<R> {
       );
     }
 
+    if let Some(plugin_global_api_scripts) = &*app_manager.plugin_global_api_scripts {
+      for script in plugin_global_api_scripts.iter() {
+        webview_attributes = webview_attributes.initialization_script(script);
+      }
+    }
+
     pending.webview_attributes = webview_attributes;
 
     let mut registered_scheme_protocols = Vec::new();
@@ -313,7 +319,12 @@ impl<R: Runtime> WebviewManager<R> {
       crypto_keys,
     } = &*app_manager.pattern
     {
-      let protocol = crate::protocol::isolation::get(assets.clone(), *crypto_keys.aes_gcm().raw());
+      let protocol = crate::protocol::isolation::get(
+        manager.manager_owned(),
+        schema,
+        assets.clone(),
+        *crypto_keys.aes_gcm().raw(),
+      );
       pending.register_uri_scheme_protocol(schema, move |request, responder| {
         protocol(request, UriSchemeResponder(responder))
       });
@@ -496,12 +507,9 @@ impl<R: Runtime> WebviewManager<R> {
       manager,
     )?;
 
-    #[cfg(any(target_os = "macos", target_os = "ios", not(ipc_custom_protocol)))]
-    {
-      pending.ipc_handler = Some(crate::ipc::protocol::message_handler(
-        manager.manager_owned(),
-      ));
-    }
+    pending.ipc_handler = Some(crate::ipc::protocol::message_handler(
+      manager.manager_owned(),
+    ));
 
     // in `windows`, we need to force a data_directory
     // but we do respect user-specification

@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -14,7 +14,7 @@
 
 use raw_window_handle::DisplayHandle;
 use serde::Deserialize;
-use std::{fmt::Debug, sync::mpsc::Sender};
+use std::{borrow::Cow, fmt::Debug, sync::mpsc::Sender};
 use tauri_utils::Theme;
 use url::Url;
 use webview::{DetachedWebview, PendingWebview};
@@ -162,9 +162,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Window icon.
 #[derive(Debug, Clone)]
-pub struct Icon {
+pub struct Icon<'a> {
   /// RGBA bytes of the icon.
-  pub rgba: Vec<u8>,
+  pub rgba: Cow<'a, [u8]>,
   /// Icon width.
   pub width: u32,
   /// Icon height.
@@ -429,7 +429,7 @@ pub trait WebviewDispatch<T: UserEvent>: Debug + Clone + Send + Sync + Sized + '
 
   // SETTER
 
-  /// Naviagte to the given URL.
+  /// Navigate to the given URL.
   fn navigate(&self, url: Url) -> Result<()>;
 
   /// Opens the dialog to prints the contents of the webview.
@@ -452,6 +452,9 @@ pub trait WebviewDispatch<T: UserEvent>: Debug + Clone + Send + Sync + Sized + '
 
   /// Moves the webview to the given window.
   fn reparent(&self, window_id: WindowId) -> Result<()>;
+
+  /// Sets whether the webview should automatically grow and shrink its size and position when the parent window resizes.
+  fn set_auto_resize(&self, auto_resize: bool) -> Result<()>;
 }
 
 /// Window dispatcher. A thread-safe handle to the window APIs.
@@ -514,7 +517,7 @@ pub trait WindowDispatch<T: UserEvent>: Debug + Clone + Send + Sync + Sized + 's
   /// - **Linux / iOS / Android:** Unsupported.
   fn is_maximizable(&self) -> Result<bool>;
 
-  /// Gets the window's native minize button state.
+  /// Gets the window's native minimize button state.
   ///
   /// ## Platform-specific
   ///

@@ -1,4 +1,4 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
@@ -391,7 +391,7 @@ impl WindowBuilder for MockWindowBuilder {
     self
   }
 
-  fn icon(self, icon: Icon) -> Result<Self> {
+  fn icon(self, icon: Icon<'_>) -> Result<Self> {
     Ok(self)
   }
 
@@ -542,6 +542,10 @@ impl<T: UserEvent> WebviewDispatch<T> for MockWebviewDispatcher {
   }
 
   fn reparent(&self, window_id: WindowId) -> Result<()> {
+    Ok(())
+  }
+
+  fn set_auto_resize(&self, auto_resize: bool) -> Result<()> {
     Ok(())
   }
 }
@@ -869,7 +873,7 @@ impl<T: UserEvent> WindowDispatch<T> for MockWindowDispatcher {
     Ok(())
   }
 
-  fn set_icon(&self, icon: Icon) -> Result<()> {
+  fn set_icon(&self, icon: Icon<'_>) -> Result<()> {
     Ok(())
   }
 

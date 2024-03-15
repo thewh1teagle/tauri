@@ -1,20 +1,17 @@
-// Copyright 2019-2023 Tauri Programme within The Commons Conservancy
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
 use crate::Result;
 
 use serde_json::{Map, Value};
-use tauri_utils::{
-  acl::{
-    capability::{Capability, PermissionEntry},
-    Scopes, Value as AclValue,
-  },
-  platform::Target,
+use tauri_utils::acl::{
+  capability::{Capability, PermissionEntry},
+  Scopes, Value as AclValue,
 };
 
 use std::{
-  collections::HashSet,
+  collections::{BTreeMap, HashSet},
   fs::{create_dir_all, write},
   path::Path,
 };
@@ -52,13 +49,7 @@ pub fn migrate(tauri_dir: &Path) -> Result<MigratedConfig> {
         windows: vec!["main".into()],
         webviews: vec![],
         permissions,
-        platforms: vec![
-          Target::Linux,
-          Target::MacOS,
-          Target::Windows,
-          Target::Android,
-          Target::Ios,
-        ],
+        platforms: None,
       })?,
     )?;
 
@@ -443,7 +434,11 @@ fn allowlist_to_permissions(
       .scope
       .0
       .into_iter()
-      .map(|p| AclValue::String(p.to_string()))
+      .map(|p| {
+        let mut map = BTreeMap::new();
+        map.insert("url".to_string(), AclValue::String(p.to_string()));
+        AclValue::Map(map)
+      })
       .collect::<Vec<_>>();
 
     permissions.push(PermissionEntry::ExtendedPermission {
@@ -645,7 +640,7 @@ mod test {
         },
         "pattern": { "use": "brownfield" },
         "security": {
-          "csp": "default-src: 'self' tauri:"
+          "csp": "default-src 'self' tauri:"
         }
       }
     });
