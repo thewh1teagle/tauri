@@ -7,7 +7,7 @@
   const osName = __TEMPLATE_os_name__
   const fetchChannelDataCommand = __TEMPLATE_fetch_channel_data_command__
   const linuxIpcProtocolEnabled = __TEMPLATE_linux_ipc_protocol_enabled__
-  let customProtocolIpcFailed = false
+  let customProtocolIpcFailed = true
 
   // on Linux we only use the custom-protocol-based IPC if the linux-ipc-protocol Cargo feature is enabled
   // on Android we never use it because Android does not have support to reading the request body
