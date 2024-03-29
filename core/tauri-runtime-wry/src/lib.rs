@@ -3924,13 +3924,13 @@ fn inner_size(
   webviews: &[WebviewWrapper],
   has_children: bool,
 ) -> TaoPhysicalSize<u32> {
-  if !has_children {
-    use wry::WebViewExtMacOS;
-    let webview = webviews.first().unwrap();
-    let view_frame = unsafe { cocoa::appkit::NSView::frame(webview.webview()) };
-    let logical: TaoLogicalSize<f64> = (view_frame.size.width, view_frame.size.height).into();
-    return logical.to_physical(window.scale_factor());
-  }
+  // if !has_children {
+  //   use wry::WebViewExtMacOS;
+  //   let webview = webviews.first().unwrap();
+  //   let view_frame = unsafe { cocoa::appkit::NSView::frame(webview.webview()) };
+  //   let logical: TaoLogicalSize<f64> = (view_frame.size.width, view_frame.size.height).into();
+  //   return logical.to_physical(window.scale_factor());
+  // }
 
   window.inner_size()
 }
