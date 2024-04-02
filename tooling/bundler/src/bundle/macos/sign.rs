@@ -205,10 +205,10 @@ fn try_sign(
     args.push(entitlements_path);
   }
 
-  if is_an_executable {
-    args.push("--options");
-    args.push("runtime");
-  }
+  // if is_an_executable {
+  //   args.push("--options");
+  //   args.push("runtime");
+  // }
 
   Command::new("codesign")
     .args(args)
