@@ -318,7 +318,7 @@ fn handle_ipc_message<R: Runtime>(request: Request<String>, manager: &AppManager
 
               match &response {
                 InvokeResponse::Ok(InvokeBody::Json(v)) => {
-                  if !(cfg!(target_os = "macos") || cfg!(target_os = "ios"))
+                  if !(cfg!(target_os = "macos") || cfg!(target_os = "ios") || cfg!(target_os = "windows"))
                     && matches!(v, JsonValue::Object(_) | JsonValue::Array(_))
                   {
                     let _ = Channel::from_callback_fn(webview, callback).send(v);
