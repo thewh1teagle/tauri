@@ -63,7 +63,9 @@ const PLUGINS: &[(&str, &[(&str, bool)])] = &[
       ("title", true),
       ("current_monitor", true),
       ("primary_monitor", true),
+      ("monitor_from_point", true),
       ("available_monitors", true),
+      ("cursor_position", true),
       ("theme", true),
       // setters
       ("center", false),
@@ -101,6 +103,7 @@ const PLUGINS: &[(&str, &[(&str, bool)])] = &[
       ("set_cursor_position", false),
       ("set_ignore_cursor_events", false),
       ("start_dragging", false),
+      ("start_resize_dragging", false),
       ("set_progress_bar", false),
       ("set_icon", false),
       ("toggle_maximize", false),
@@ -121,6 +124,7 @@ const PLUGINS: &[(&str, &[(&str, bool)])] = &[
       ("set_webview_size", false),
       ("set_webview_position", false),
       ("set_webview_focus", false),
+      ("set_webview_zoom", false),
       ("print", false),
       ("reparent", false),
       // internal

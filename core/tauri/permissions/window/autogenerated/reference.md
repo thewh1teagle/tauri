@@ -10,6 +10,8 @@
 |`deny-create`|Denies the create command without any pre-configured scope.|
 |`allow-current-monitor`|Enables the current_monitor command without any pre-configured scope.|
 |`deny-current-monitor`|Denies the current_monitor command without any pre-configured scope.|
+|`allow-cursor-position`|Enables the cursor_position command without any pre-configured scope.|
+|`deny-cursor-position`|Denies the cursor_position command without any pre-configured scope.|
 |`allow-destroy`|Enables the destroy command without any pre-configured scope.|
 |`deny-destroy`|Denies the destroy command without any pre-configured scope.|
 |`allow-hide`|Enables the hide command without any pre-configured scope.|
@@ -44,6 +46,8 @@
 |`deny-maximize`|Denies the maximize command without any pre-configured scope.|
 |`allow-minimize`|Enables the minimize command without any pre-configured scope.|
 |`deny-minimize`|Denies the minimize command without any pre-configured scope.|
+|`allow-monitor-from-point`|Enables the monitor_from_point command without any pre-configured scope.|
+|`deny-monitor-from-point`|Denies the monitor_from_point command without any pre-configured scope.|
 |`allow-outer-position`|Enables the outer_position command without any pre-configured scope.|
 |`deny-outer-position`|Denies the outer_position command without any pre-configured scope.|
 |`allow-outer-size`|Enables the outer_size command without any pre-configured scope.|
@@ -110,6 +114,8 @@
 |`deny-show`|Denies the show command without any pre-configured scope.|
 |`allow-start-dragging`|Enables the start_dragging command without any pre-configured scope.|
 |`deny-start-dragging`|Denies the start_dragging command without any pre-configured scope.|
+|`allow-start-resize-dragging`|Enables the start_resize_dragging command without any pre-configured scope.|
+|`deny-start-resize-dragging`|Denies the start_resize_dragging command without any pre-configured scope.|
 |`allow-theme`|Enables the theme command without any pre-configured scope.|
 |`deny-theme`|Denies the theme command without any pre-configured scope.|
 |`allow-title`|Enables the title command without any pre-configured scope.|

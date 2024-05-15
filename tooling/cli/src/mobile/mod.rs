@@ -229,7 +229,7 @@ fn env() -> Result<Env, EnvError> {
   Ok(env)
 }
 
-pub struct OptionsHandle(Runtime, ServerHandle);
+pub struct OptionsHandle(#[allow(unused)] Runtime, #[allow(unused)] ServerHandle);
 
 /// Writes CLI options to be used later on the Xcode and Android Studio build commands
 pub fn write_options(identifier: &str, mut options: CliOptions) -> crate::Result<OptionsHandle> {
@@ -261,12 +261,15 @@ fn read_options(identifier: &str) -> CliOptions {
   let runtime = tokio::runtime::Runtime::new().unwrap();
   let options = runtime
     .block_on(async move {
+      let addr_path = temp_dir().join(format!("{identifier}-server-addr"));
       let (tx, rx) = WsTransportClientBuilder::default()
         .build(
           format!(
             "ws://{}",
-            read_to_string(temp_dir().join(format!("{identifier}-server-addr")))
-              .expect("missing addr file")
+            read_to_string(&addr_path).unwrap_or_else(|e| panic!(
+              "failed to read missing addr file {}: {e}",
+              addr_path.display()
+            ))
           )
           .parse()
           .unwrap(),
@@ -293,7 +296,7 @@ pub fn get_app(config: &TauriConfig, interface: &AppInterface) -> App {
     domain.push('.');
   }
   if domain.is_empty() {
-    domain = config.identifier.clone();
+    domain.clone_from(&config.identifier);
     if domain.is_empty() {
       log::error!("Bundle identifier set in `tauri.conf.json > identifier` cannot be empty");
       exit(1);
